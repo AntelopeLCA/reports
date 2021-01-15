@@ -6,6 +6,22 @@ from pandas import DataFrame, MultiIndex
 from antelope_core.lcia_results import LciaResult
 
 
+def _tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec'):
+    """
+    Need to figure out how to bring \tabspec in-- (answer: jinja?)
+    :param df:
+    :param filename:
+    :param width:
+    :return:
+    """
+    longstr = df.to_latex(column_format=column_format)
+    tabularx = longstr.replace(
+        '{tabular}', '{tabularx}').replace(
+        'begin{tabularx}', 'begin{tabularx}{%s}' % width)
+    with open(filename, 'w') as fp:
+        fp.write(tabularx)
+
+
 def weigh_lcia_results(quantity, *args, weight=None):
     """
     Merge together a collection of LciaResult objects
@@ -275,6 +291,20 @@ class LcaModelRunner(object):
                         for l in self.quantities),
                        index=MultiIndex.from_tuples(self._qty_tuples))
         return self._finish_dt_output(dt, column_order, filename)
+    
+    def results_to_tex(self, filename, scenario=None, **kwargs):
+        """
+        Print summary table (scenario=None) or detail table (scenario is not None) in tabularx format
+        :param tex_file:
+        :param scenario:
+        :param kwargs:
+        :return:
+        """
+        if scenario is None:
+            df = self.scenario_summary_tbl(**kwargs)
+        else:
+            df = self.scenario_detail_tbl(scenario, **kwargs)
+        _tabularx_ify(df, filename)
 
     '''
     Subclass must implement only one function: a mapping from scenario key and lcia method to result

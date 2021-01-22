@@ -154,6 +154,7 @@ class XlsxForegroundUpdater(XlsxUpdater):
                 parent = None
             else:
                 parent = self.ar[frag['parent']]
+                parent.to_foreground()
             f = self._find_frag(frag)
             if f is None:
                 f = self.ar.new_fragment(frag[self.flow_key], frag['direction'], parent=parent,
@@ -190,7 +191,7 @@ class XlsxForegroundUpdater(XlsxUpdater):
                 raise KeyError('Unable to find this frag! %s' % frag)
             if frag.get('exchange_value') is not None:
                 self.ar.observe(f, exchange_value=float(frag['exchange_value']), units=frag.get('units'))
-            if frag.get('termination') is None:
+            if frag.get('termination') is None and len(list(frag.child_flows)) == 0:
                 f.clear_termination()
             else:
                 if frag['termination'] == 'self':

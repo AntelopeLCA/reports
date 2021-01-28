@@ -191,8 +191,11 @@ class XlsxForegroundUpdater(XlsxUpdater):
                 raise KeyError('Unable to find this frag! %s' % frag)
             if frag.get('exchange_value') is not None:
                 self.ar.observe(f, exchange_value=float(frag['exchange_value']), units=frag.get('units'))
-            if frag.get('termination') is None and len(list(frag.child_flows)) == 0:
-                f.clear_termination()
+            if frag.get('termination') is None:
+                if len(list(f.child_flows)) == 0:
+                    f.clear_termination()
+                # else- nothing to do- just
+                continue
             else:
                 if frag['termination'] == 'self':
                     f.to_foreground()

@@ -250,7 +250,7 @@ class LcaModelRunner(object):
                 'result': self._format(res.total())
                  })
 
-    def _finish_dt_output(self, dt, column_order, filename):
+    def _finish_dt_output(self, dt, column_order, filename, norm=False):
         """
         Add a units column, order it first, and transpose
         :param dt:
@@ -265,6 +265,11 @@ class LcaModelRunner(object):
             ord_columns += [k for k in dt.columns if k not in ord_columns]
 
         dto = dt[ord_columns].transpose()
+        if norm:
+            dn = DataFrame({'Normalization': [l.norm() for l in self.quantities]},
+                           index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
+            dto = dn.append(dto)
+
         if filename is not None:
             dto.to_csv(filename, quoting=csv.QUOTE_ALL)
 
@@ -278,19 +283,19 @@ class LcaModelRunner(object):
             else:
                 yield q['Name'], q['Indicator'], q.unit
 
-    def scenario_detail_tbl(self, scenario, filename=None, column_order=None):
+    def scenario_detail_tbl(self, scenario, filename=None, column_order=None, norm=False):
         dt = DataFrame(({k.entity: self._format(k.cumulative_result)
                          for k in self.result(scenario, l).aggregate(key=self._agg).components()}
                         for l in self.quantities), index=MultiIndex.from_tuples(self._qty_tuples))
-        return self._finish_dt_output(dt, column_order, filename)
+        return self._finish_dt_output(dt, column_order, filename, norm=norm)
 
-    def scenario_summary_tbl(self, filename=None, column_order=None):
+    def scenario_summary_tbl(self, filename=None, column_order=None, norm=False):
         if column_order is None:
             column_order = list(self.scenarios)
         dt = DataFrame(({k: self._format(self.result(k, l).total()) for k in column_order}
                         for l in self.quantities),
                        index=MultiIndex.from_tuples(self._qty_tuples))
-        return self._finish_dt_output(dt, column_order, filename)
+        return self._finish_dt_output(dt, column_order, filename, norm=norm)
     
     def results_to_tex(self, filename, scenario=None, **kwargs):
         """

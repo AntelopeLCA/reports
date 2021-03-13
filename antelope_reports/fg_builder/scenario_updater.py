@@ -9,7 +9,16 @@ ScenarioTermination = namedtuple('ScenarioTermination', ('fragment', 'scenario',
 
 class XlsxScenarioUpdater(object):
     """
+    Apply scenarios to the fragments found in an foreground archive.
+    Operates as a context manager:
+    >>> with XlsxScenarioUpdater(fg, xlsx, *sheets) as a:
+    >>>    a.apply()
+    NOTE: all pre-existing scenarios in fg are removed and replaced with the ones found in *sheets
 
+    There are two different patterns for a sheet listed in *sheets (both can coexist) (all case-insensitive):
+     - observations: must have columns 'fragment', 'scenario', 'observedValue'
+     - terminations: must have columns 'fragment', 'scenario', 'termination', 'term_flow'
+       term_flow can be omitted but is obligatory in many cases
     """
 
     @staticmethod

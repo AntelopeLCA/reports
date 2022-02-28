@@ -6,6 +6,14 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
     """
     This runs a single model (fragment), applying a set of different scenario specifications. 
     """
+    @staticmethod
+    def _scenario_tuple(arg):
+        if arg:
+            if isinstance(arg, tuple):
+                return arg
+            else:
+                return arg,
+        return ()
 
     def __init__(self, model, *common_scenarios, agg_key=None):
         """
@@ -34,6 +42,32 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self._common_scenarios.remove(scenario)
         self.recalculate()
 
+    def _recalculate_case(self, case, **kwargs):
+        for q in self.lcia_methods:
+            self.run_lcia_case_method(case, q, **kwargs)
+        for w in self.weightings:
+            self._run_case_weighting(case, w)
+
+    def add_case_param(self, case, param):
+        if case not in self._params:
+            raise KeyError('Unknown case %s' % case)
+        assert isinstance(param, str)
+        if param in self._params[case]:
+            print('Param %s already in case %s' % (param, case))
+        else:
+            self._params[case] += (param, )
+        self._recalculate_case(case)
+
+    def remove_case_param(self, case, param):
+        if case not in self._params:
+            raise KeyError('Unknown case %s' % case)
+        assert isinstance(param, str)
+        if param not in self._params[case]:
+            raise ValueError('Param %s not in case %s' % (param, case))
+        else:
+            self._params[case] = tuple(filter(lambda x: x != param, self._params[case]))
+        self._recalculate_case(case)
+
     @property
     def common_scenarios(self):
         for k in sorted(self._common_scenarios):
@@ -41,11 +75,8 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
 
     def add_case(self, case, params):
         self.add_scenario(case)  # raises KeyError
-        if isinstance(params, str):
-            params = (params, )
-        else:
-            params = tuple(params)
-        self._params[case] = params
+        self._params[case] = self._scenario_tuple(params)
+        self._recalculate_case(case)
 
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]

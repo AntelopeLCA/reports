@@ -132,7 +132,15 @@ class LcaModelRunner(object):
 
     @format.setter
     def format(self, fmt):
-        self._fmt = str(fmt)
+        """
+        None means do not format output; return raw numbers
+        :param fmt:
+        :return:
+        """
+        if fmt is None:
+            self._fmt = None
+        else:
+            self._fmt = str(fmt)
 
     def add_weighting(self, quantity, *measures, weight=None):
         """
@@ -148,14 +156,18 @@ class LcaModelRunner(object):
         self._weightings[quantity] = weight
         self._run_weighting(quantity)
 
+    def _run_case_weighting(self, scen, quantity):
+        ws = self._weightings[quantity]
+        res = [self.result(scen, q) for q in ws.keys()]
+        wgt = weigh_lcia_results(quantity, *res, weight=ws)
+        self._results[scen, quantity] = wgt
+
     def _run_weighting(self, quantity):
         ws = self._weightings[quantity]
         for q in ws.keys():
             self.run_lcia(q)
         for scen in self.scenarios:
-            res = [self.result(scen, q) for q in ws.keys()]
-            wgt = weigh_lcia_results(quantity, *res, weight=ws)
-            self._results[scen, quantity] = wgt
+            self._run_case_weighting(scen, quantity)
 
     @property
     def stages(self):
@@ -167,15 +179,18 @@ class LcaModelRunner(object):
     def result(self, scenario, lcia_method):
         return self._results[scenario, lcia_method]
 
+    def run_lcia_case_method(self, scen, lcia, **kwargs):
+        res = self._run_scenario_lcia(scen, lcia, **kwargs)
+        res.scenario = scen
+        for stg in list(res.aggregate(key=self._agg).keys()):
+            self._seen_stages[stg].add(scen)
+        self._results[scen, lcia] = res
+
     def run_lcia(self, lcia, **kwargs):
         if lcia not in self._lcia_methods:
             self._lcia_methods.append(lcia)
         for scen in self.scenarios:
-            res = self._run_scenario_lcia(scen, lcia, **kwargs)
-            res.scenario = scen
-            for stg in list(res.aggregate(key=self._agg).keys()):
-                self._seen_stages[stg].add(scen)
-            self._results[scen, lcia] = res
+            self.run_lcia_case_method(scen, lcia, **kwargs)
         return self.lcia_results(lcia)
 
     def lcia_results(self, lcia):
@@ -262,7 +277,7 @@ class LcaModelRunner(object):
             ord_columns = list(dt.columns)
         else:
             ord_columns = [k for k in column_order if k in dt.columns]
-            ord_columns += [k for k in dt.columns if k not in ord_columns]
+            ord_columns += [k for k in dt.columns if k not in ord_columns]  # add in anything that's missed
 
         dto = dt[ord_columns].transpose()
         if norm:
@@ -300,7 +315,7 @@ class LcaModelRunner(object):
     def results_to_tex(self, filename, scenario=None, **kwargs):
         """
         Print summary table (scenario=None) or detail table (scenario is not None) in tabularx format
-        :param tex_file:
+        :param filename: tex file
         :param scenario:
         :param kwargs:
         :return:

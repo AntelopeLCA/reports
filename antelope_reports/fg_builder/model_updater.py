@@ -207,8 +207,8 @@ class XlsxForegroundUpdater(XlsxUpdater):
                     continue
                 if f.term.is_null or f.term.term_node != term:
                     f.clear_termination()
-                    if term.entity_type == 'process':
-                        f.set_background()  # processes are background-terminated
+                    # if term.entity_type == 'process':
+                    #     f.set_background()  # processes are background-terminated ## outmoded
                     tflow = frag.get('term_flow')
                     if tflow is not None:
                         tflow = self.get_flow(tflow)

@@ -130,7 +130,8 @@ def stack_bar(ax, data, hue, units, title='Contribution Analysis', subtitle='by 
     stack_bars(ax, [data], hue, [units], title=title, subtitle=subtitle, **kwargs)
 
 
-def stack_bars(ax, series, hue, units, labels=None, title='Scenario Analysis', subtitle='by stage', **kwargs):
+def stack_bars(ax, series, hue, units, labels=None, title='Scenario Analysis', subtitle='by stage',
+               center_scale=False, **kwargs):
     """
 
     :param ax:
@@ -153,6 +154,10 @@ def stack_bars(ax, series, hue, units, labels=None, title='Scenario Analysis', s
             right = poss
         if negs < left:
             left = negs
+
+    if center_scale:
+        right = max([abs(right), abs(left)])
+        left = -right
 
     data_range = right - left
     threshold = 0.07 * data_range
@@ -210,7 +215,7 @@ def stack_bar_figure(results, stages, hues=None, color_dict=None, legend=False):
     if hues is None:
         hues = [None] * len(results)
 
-    units = [r.quantity.unit() for r in results]
+    units = [r.quantity.unit for r in results]
 
     # prepare data, determine figure height
     height = 0
@@ -297,7 +302,8 @@ def _scenario_fig_height(results, scenario=False):
     return height
 
 
-def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile=None):
+def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile=None, center_scale=False,
+                            figwidth=8):
     """
     A bit of a swiss army knife.
 
@@ -308,22 +314,22 @@ def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile
      an m-array of n-arrays of LciaResult objects. Creates an n-subplot figure of m-stacked pos/neg bars, each
      featuring k stages
 
-    :param results: either a n-array or a k-by-n array of results
+    :param results: either a n-array or a m-by-n array of results
     :param stages: k query terms to results
     :param hues: for n quantities represented (quick-compute from UUID)
-    :param scenarios:
+    :param scenarios: None or m-array
     :param savefile: if present, save the fig to the specified file
     :return:
     """
 
     if scenarios is None:
         height = _scenario_fig_height(results, scenario=False)
-        fig = plt.figure(figsize=(8, height))
+        fig = plt.figure(figsize=(figwidth, height))
         quantities = [r.quantity for r in results]
 
     else:
         height = _scenario_fig_height(results, scenario=True)
-        fig = plt.figure(figsize=(8, height))
+        fig = plt.figure(figsize=(figwidth, height))
         quantities = [r.quantity for r in results[0]]
 
     if hues is None:
@@ -338,12 +344,13 @@ def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile
 
         if scenarios is None:
             series = results[n].contrib_query(stages)
-            stack_bars(ax, [series], hue, [quantity.unit()],
-                       title=quantity['Name'], subtitle=quantity['Indicator'])
+            stack_bars(ax, [series], hue, [quantity.unit],
+                       title=quantity['Name'], subtitle=quantity['Indicator'],
+                       center_scale=center_scale)
 
         else:
             series = [r[n].contrib_query(stages) for r in results]
-            units = [r[n].quantity.unit() for r in results]
+            units = [r[n].quantity.unit for r in results]
 
             stack_bars(ax, series, hue, units, labels=scenarios,
                        title=quantity['Name'], subtitle=quantity['Indicator'])

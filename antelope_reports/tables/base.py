@@ -235,6 +235,7 @@ class BaseTableOutput(object):
         body = []
         width = max(6, width)
 
+        # widths of each column
         wds = [len(header[i]) for i in range(len(self._near_headings))]
 
         # determine column widths

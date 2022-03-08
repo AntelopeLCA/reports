@@ -9,23 +9,27 @@ class FlowablesGrid(BaseTableOutput):
 
     """
     _near_headings = 'Flowable', 'Compartment'  # should be overridden
+    _far_headings = 'Set',
     _returns_sets = True
 
     def _pull_row_from_item(self, item):
         """
         Items are either exchanges, factors, or flattened LciaResult components.
-        The first two have a 'flow' attribute
+        The first has a 'flow' entity by attribute
+        the middle has a flowable and also a context
         the last has an 'entity' which should be a flow.
         :param item:
         :return: 2-tuple: flowable name (string), compartment (Compartment)
         """
-        if hasattr(item, 'flow'):
-            flow = item.flow
+        if hasattr(item, 'entity_type'):
+            if item.entity_type == 'exchange':
+                return item.flow.name, item.termination
+            elif item.entity_type == 'characterization':
+                return item.flowable, item.context
         elif hasattr(item, 'entity'):
             flow = item.entity
-        else:
-            raise TypeError('Cannot find a flow in item of type %s' % type(item))
-        return self._qdb.parse_flow(flow)
+            return flow.name, flow.context
+        raise TypeError('Cannot find a flow in item of type %s' % type(item))
 
     def _generate_items(self, flow_collection):
         """
@@ -43,25 +47,20 @@ class FlowablesGrid(BaseTableOutput):
         elif hasattr(flow_collection, 'entity_type'):
             if flow_collection.entity_type == 'process':
                 for exchange in flow_collection.inventory():
-                    if self._criterion(exchange.flow):
+                    if self._criterion(exchange):
                         yield exchange
             elif flow_collection.entity_type == 'quantity':
                 if flow_collection.is_lcia_method:
-                    if self._qdb.is_known(flow_collection):
-                        for cf in self._qdb.factors(flow_collection):
-                            if self._criterion(cf.flow):
-                                yield cf
-                    else:
-                        for cf in flow_collection.factors():
-                            if self._criterion(cf.flow):
-                                yield cf
+                    for cf in flow_collection.factors():
+                        if self._criterion(cf):
+                            yield cf
         else:
             # generic iterable-- assume exchange for now
             for x in flow_collection:
-                if self._criterion(x.flow):
+                if self._criterion(x):
                     yield x
 
-    def _canonical(self, flow):
+    def _canonical(self, flow, unit=None):
         """
 
         use name: this is not quite right because parse_flow is too 'fuzzy'--
@@ -77,8 +76,9 @@ class FlowablesGrid(BaseTableOutput):
         :param flow:
         :return:
         """
-        name, _ = self._qdb.parse_flow(flow)
-        return '[%s] %s' % (flow.unit(), self._qdb.f_name(name))
+        name = self._qdb.get_flowable(flow).name
+        unit = unit or flow.unit
+        return '[%s] %s' % (unit, name)
 
     def _extract_data_from_item(self, objects):
         """
@@ -104,16 +104,18 @@ class FlowablesGrid(BaseTableOutput):
                     if item.value is not None:
                         d[self._canonical(item.flow)] += item.value
                 elif item.entity_type == 'characterization':
+                    # WHAT is going on here?
                     for loc, v in item._locations.items():
                         if loc == 'GLO':
-                            key = self._canonical(item.flow)
+                            key = self._canonical(item.flowable, unit=item.ref_quantity.unit)
                         else:
                             # there 'should not be' different cf values for the same flowable- but we know it happens
                             key = loc
                         if d[key] == 0:
                             d[key] = v
                         elif d[key] != v:
-                            new_key = '[%s] %s' % (loc, item.flow['Name'])
+                            # right. very clever - log locales in canonical names
+                            new_key = '[%s] %s' % (loc, item.flowable)
                             while d[new_key] != 0:
                                 new_key += '.'
                             d[new_key] = v

@@ -36,7 +36,13 @@ class _PosNegAxes(object):
         self._size = size
         self._qty = qty
 
-        self._color = color or random_color(qty.uuid)
+        if not color:
+            if qty.has_property('color'):
+                color = qty['color']
+            else:
+                color = random_color(qty.uuid)
+
+        self._color = color
 
         x, y = span  # to confirm it's a 2-tuple
         self._span = x, y
@@ -65,16 +71,17 @@ class _PosNegAxes(object):
         """
         return (self._span[1] - self._span[0]) * self._ar_scale / (self._size * 18)
 
-    def draw_pos_neg(self, x, pos, neg, num_format):
+    def draw_pos_neg(self, x, pos, neg, num_format, pos_err=0):
 
         pos *= self._ar_scale
+        pos_top = pos + pos_err * self._ar_scale
         neg *= self._ar_scale
 
         h = self._ax.bar(x, pos, align='center', width=0.85 * self._bw, color=self._color)
         if self._pos_handle is None:
             self._pos_handle = h
         if neg != 0:
-            self._ax.text(x + 0.5 * self._bw, pos + self._tgap, num_format % pos, ha='center', va='bottom',
+            self._ax.text(x + 0.5 * self._bw, pos_top + self._tgap, num_format % pos, ha='center', va='bottom',
                           fontsize=self._fontsize)
             x += self._bw
             h = self._ax.bar(x, neg, bottom=pos, width=0.62 * self._bw, align='center', color=net_color,
@@ -99,9 +106,14 @@ class _PosNegAxes(object):
                           fontsize=self._fontsize)
 
     def draw_error_bars(self, x, pos, pos_err, neg, neg_err):
+        pos *= self._ar_scale
+        neg *= self._ar_scale
+        pe = (self._ar_scale * k for k in pos_err)
+        ne = (self._ar_scale * k for k in neg_err)
+
         xs = [x, x + self._bw]
         ys = [pos, pos + neg]
-        yerr = list(zip(pos_err, neg_err))
+        yerr = list(zip(pe, ne))
         self._ax.errorbar(xs, ys, yerr=yerr, fmt='.', color='#305040')
 
     def finish(self, legend=True):
@@ -211,7 +223,7 @@ class PosNegChart(object):
 
 class PosNegCompare(object):
     def __init__(self, *args, size=4, aspect=0.4, bar_width=0.28, filename=None,
-                 num_format='%3.2g', legend=False, **kwargs):
+                 num_format='%3.2g', legend=False, color=None, **kwargs):
         """
         A slightly different version, where different results are assumed to have different quantities and each
         is drawn on its own axes, but the spans of all axes are set to match the maximal pos/neg ratio (so the
@@ -223,6 +235,8 @@ class PosNegCompare(object):
         :param filename: to save. default 'pos_neg_compare.eps'. To suppress save, pass 'none' (literal string) as filename
         :param num_format: default %3.2g
         :param csv_file: [None] if non-None, write a summary table to a csv file
+        :param color: a sequence of bar color specs (RGB 3-tuples) the same length as the args.  If omitted, colors
+        will be drawn first from each quantity's 'color' property, or else a random color based on the quantity's UUID
         :param kwargs: autorange, fontsize
         :param legend:
         """
@@ -259,13 +273,22 @@ class PosNegCompare(object):
         self._pna = []
 
         for i, arg in enumerate(args):
+
+            if color:
+                try:
+                    c = color[i]
+                except (IndexError, TypeError, AttributeError):
+                    print('%d failed colorspec' % i)
+                    c = None
+            else:
+                c = None
             ax = fig.add_axes([i/n, 0, 0.8/n, 1.0])
             qty = arg.quantity
 
             span = (-1 * max_ratio * self._pos[i], self._pos[i])
             print(span)
 
-            self._pna.append(_PosNegAxes(ax, size, qty, span, bar_width=bar_width, **kwargs))
+            self._pna.append(_PosNegAxes(ax, size, qty, span, bar_width=bar_width, color=c, **kwargs))
             self._pna[i].draw_pos_neg(1, self._pos[i], self._neg[i], num_format=num_format)
 
             self._pna[i].finish(legend=legend)
@@ -302,7 +325,7 @@ class PosNegCompare(object):
 
 class PosNegCompareError(object):
     def __init__(self, *args, size=4, aspect=0.4, bar_width=0.28, filename=None,
-                 num_format='%3.2g', legend=False, **kwargs):
+                 num_format='%3.2g', legend=False, color=None, **kwargs):
         """
         Adds errorbars to above.  This should drop-in replace PosNegCompare because it is a proper superset of
         functionality with a workalike interface.
@@ -314,6 +337,8 @@ class PosNegCompareError(object):
         :param filename: to save. default 'pos_neg_compare.eps'. To suppress save, pass 'none' (literal string) as filename
         :param num_format: default %3.2g
         :param csv_file: [None] if non-None, write a summary table to a csv file
+        :param color: a sequence of bar color specs (RGB 3-tuples) the same length as the args.  If omitted, colors
+        will be drawn first from each quantity's 'color' property, or else a random color based on the quantity's UUID
         :param kwargs: autorange, fontsize
         :param legend:
         """
@@ -327,15 +352,15 @@ class PosNegCompareError(object):
         _overdraw = []
 
         def _get_pos_neg(_arg):
-            _pos = 0.0
-            _neg = 0.0
-            for c in _arg.keys():
-                val = _arg[c].cumulative_result
+            _pos_ = 0.0
+            _neg_ = 0.0
+            for comp in _arg.keys():
+                val = _arg[comp].cumulative_result
                 if val > 0:
-                    _pos += val
+                    _pos_ += val
                 else:
-                    _neg += val
-            return _pos, _neg
+                    _neg_ += val
+            return _pos_, _neg_
 
         for i, arg in enumerate(args):
             if isinstance(arg, tuple):
@@ -394,17 +419,32 @@ class PosNegCompareError(object):
 
         for i, arg in enumerate(args):
             if isinstance(arg, tuple):
-                qty = arg[0].quantity
+                try:
+                    qty = arg[0].quantity
+                except AttributeError:
+                    print(i)
+                    print(arg[0])
+                    raise
             else:
                 qty = arg.quantity
+
+            if color:
+                try:
+                    c = color[i]
+                except (IndexError, TypeError, AttributeError):
+                    print('%d failed colorspec' % i)
+                    c = None
+            else:
+                c = None
+
             ax = fig.add_axes([i/n, 0, 0.8/n, 1.0])
 
 
             span = (-1 * max_ratio * self._pos[i], max_over * self._pos[i])
             print(span)
 
-            self._pna.append(_PosNegAxes(ax, size, qty, span, bar_width=bar_width, **kwargs))
-            self._pna[i].draw_pos_neg(1, self._pos[i], self._neg[i], num_format=num_format)
+            self._pna.append(_PosNegAxes(ax, size, qty, span, bar_width=bar_width, color=c, **kwargs))
+            self._pna[i].draw_pos_neg(1, self._pos[i], self._neg[i], num_format=num_format, pos_err=self._pos_err[i][1])
 
             if any(self._pos_err[i] + self._neg_err[i]):
                 self._pna[i].draw_error_bars(1, self._pos[i], self._pos_err[i], self._neg[i], self._neg_err[i])

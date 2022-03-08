@@ -31,18 +31,27 @@ def _fade_color(color):
     return colorsys.hsv_to_rgb(hsv[0], hsv[1], hsv[2]*0.8)
 
 
-def random_color(uuid, sat=0.65, val=0.95, offset=14669):
+def random_color(seed, sat=0.65, val=0.95, offset=14669):
 
-    hue = ((int('%.4s' % uuid, 16) + offset) % 65536) / 65536
+    # hue = ((int('%.4s' % uuid, 16) + offset) % 65536) / 65536
+    hue = (hash((seed, offset)) % 65536)/65536
     return colorsys.hsv_to_rgb(hue, sat, val)
 
 
 def grab_stages(*results, sort=None):
     stages = set()
+
+    def _first_score(_comp):
+        for r in results:
+            try:
+                return r[_comp].cumulative_result
+            except KeyError:
+                continue
+        return 0
     for r in results:
         stages = stages.union(r.keys())
     if sort is None:
-        return list(stages)
+        return sorted(stages, key=_first_score, reverse=True)
     else:
         return sorted(stages, key=sort)
 

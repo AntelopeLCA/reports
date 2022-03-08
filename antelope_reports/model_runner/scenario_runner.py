@@ -1,6 +1,8 @@
 from .components_mixin import ComponentsMixin
 from .lca_model_runner import LcaModelRunner
 
+from antelope_foreground.fragment_flows import frag_flow_lcia
+
 
 class ScenarioRunner(ComponentsMixin, LcaModelRunner):
     """
@@ -25,6 +27,8 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self._common_scenarios = set()
 
         self._model = model
+        self._traversals = dict()
+
         self._params = dict()
 
         for scenario in common_scenarios:
@@ -42,7 +46,18 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self._common_scenarios.remove(scenario)
         self.recalculate()
 
+    def traverse_all(self):
+        for case in self.scenarios:
+            self._traverse_case(case)
+
+    def _traverse_case(self, case):
+        print('traversing %s' % case)
+        sc = self._params[case]
+        sc_apply = sc + tuple(self.common_scenarios)
+        self._traversals = list(self._model.traverse(sc_apply))
+
     def _recalculate_case(self, case, **kwargs):
+        self._traverse_case(case)
         for q in self.lcia_methods:
             self.run_lcia_case_method(case, q, **kwargs)
         for w in self.weightings:
@@ -81,6 +96,6 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]
         sc_apply = sc + tuple(self.common_scenarios)
-        return self._model.fragment_lcia(lcia, scenario=sc_apply, **kwargs)
+        return frag_flow_lcia(self._traversals[scenario], lcia, scenario=sc_apply, **kwargs)
 
 

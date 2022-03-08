@@ -4,8 +4,8 @@ requires = [
     'antelope_core>=0.1.1',
     'pandas',
     'matplotlib',
-    'colorsys',
-    'textwrap'
+#    'colorsys',  # builtin
+#    'textwrap'  # builtin
 ]
 
 """

@@ -1,4 +1,4 @@
-from .scenario_runner import ScenarioRunner
+from .scenario_runner import ScenarioRunner, frag_flow_lcia
 from collections import defaultdict
 
 
@@ -9,30 +9,63 @@ class SensitivityRunner(ScenarioRunner):
         self._results_hi = dict()
         self._results_lo = dict()
 
+        self._traversals_hi = dict()
+        self._traversals_lo = dict()
+
         self._sens_hi = self._scenario_tuple(sens_hi)
         self._sens_lo = self._scenario_tuple(sens_lo)
 
     def add_hi_sense(self, param):
         self._sens_hi += self._scenario_tuple(param)
+        for case in self.scenarios:
+            self._traverse_hi(case)
 
     def add_lo_sense(self, param):
         self._sens_lo += self._scenario_tuple(param)
+        for case in self.scenarios:
+            self._traverse_lo(case)
+
+    def _traverse_hi(self, case):
+        sc = self._params[case]
+        sc_apply = sc + tuple(self.common_scenarios)
+
+        sc_hi = sc_apply + self._sens_hi
+        self._traversals_hi[case] = self._model.traverse(scenario=sc_hi)
+
+    def _traverse_lo(self, case):
+        sc = self._params[case]
+        sc_apply = sc + tuple(self.common_scenarios)
+
+        sc_lo = sc_apply + self._sens_lo
+        self._traversals_lo[case] = self._model.traverse(scenario=sc_lo)
+
+    def _traverse_case(self, case):
+        print('traversing %s' % case)
+        sc = self._params[case]
+        sc_apply = sc + tuple(self.common_scenarios)
+        self._traversals[case] = list(self._model.traverse(sc_apply))
+
+        if self._sens_hi:
+            self._traverse_hi(case)
+
+        if self._sens_lo:
+            self._traverse_lo(case)
 
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]
         sc_apply = sc + tuple(self.common_scenarios)
 
-        res = self._model.fragment_lcia(lcia, scenario=sc_apply, **kwargs)
+        res = frag_flow_lcia(self._traversals[scenario], lcia, scenario=sc_apply, **kwargs)
 
         if self._sens_hi:
             sc_hi = sc_apply + self._sens_hi
-            self._results_hi[scenario, lcia] = self._model.fragment_lcia(lcia, scenario=sc_hi, **kwargs)
+            self._results_hi[scenario, lcia] = frag_flow_lcia(self._traversals_hi[scenario], lcia, scenario=sc_hi, **kwargs)
         else:
             self._results_hi[scenario, lcia] = res
 
         if self._sens_lo:
             sc_lo = sc_apply + self._sens_lo
-            self._results_lo[scenario, lcia] = self._model.fragment_lcia(lcia, scenario=sc_lo, **kwargs)
+            self._results_lo[scenario, lcia] = frag_flow_lcia(self._traversals_lo[scenario], lcia, scenario=sc_lo, **kwargs)
         else:
             self._results_lo[scenario, lcia] = res
 

@@ -67,6 +67,8 @@ class LcaModelRunner(object):
         self._lcia_methods = []
         self._weightings = dict()
 
+        self._publish = None
+
         self._results = dict()
         self.set_agg_key(agg_key)
 
@@ -76,6 +78,14 @@ class LcaModelRunner(object):
             self.run_lcia(l)
         for w in self.weightings:
             self._run_weighting(w)
+
+    def set_publication_quantities(self, *qs):
+        """
+        Use this to constrain automatically-generated output to a subset of calculated quantities.
+        :param qs:
+        :return:
+        """
+        self._publish = list(q for q in qs if q in self._lcia_methods or q in self._weightings)
 
     def set_agg_key(self, agg_key=None):
         if agg_key is None:
@@ -105,11 +115,15 @@ class LcaModelRunner(object):
         This returns known quantities (second result index)
         :return:
         """
-        for k in self.lcia_methods:
-            yield k
-        for k in self.weightings:
-            yield k
-
+        if self._publish is not None:
+            for k in self._publish:
+                yield k
+        else:
+            for k in self.lcia_methods:
+                yield k
+            for k in self.weightings:
+                yield k
+                
     @property
     def lcia_methods(self):
         """
@@ -312,19 +326,27 @@ class LcaModelRunner(object):
                        index=MultiIndex.from_tuples(self._qty_tuples))
         return self._finish_dt_output(dt, column_order, filename, norm=norm)
     
-    def results_to_tex(self, filename, scenario=None, **kwargs):
+    def results_to_tex(self, filename, scenario=None, format=None, **kwargs):
         """
         Print summary table (scenario=None) or detail table (scenario is not None) in tabularx format
         :param filename: tex file
         :param scenario:
+        :param format: temporarily set output format for TeX file
         :param kwargs:
         :return:
         """
+        oldformat = self.format
+
+        if format:
+            self.format = format
+
         if scenario is None:
             df = self.scenario_summary_tbl(**kwargs)
         else:
             df = self.scenario_detail_tbl(scenario, **kwargs)
         _tabularx_ify(df, filename)
+
+        self.format = oldformat
 
     '''
     Subclass must implement only one function: a mapping from scenario key and lcia method to result

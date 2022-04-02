@@ -6,15 +6,22 @@ from pandas import DataFrame, MultiIndex
 from antelope_core.lcia_results import LciaResult
 
 
-def _tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec'):
+def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', sort_column=None, **kwargs):
     """
     Need to figure out how to bring \tabspec in-- (answer: jinja?)
     :param df:
     :param filename:
     :param width:
+    :param column_format: column format specification
+    :param sort_column: optional integer column number by which to sort (most positive to most negative)
     :return:
     """
-    longstr = df.to_latex(column_format=column_format)
+    if sort_column is not None:
+        # this shenanigan is necessary because tex output is often string-ified for clean formatting
+        df['sort'] = df.iloc[:,sort_column].apply(float)
+        df = df.sort_values('sort', ascending=False).drop('sort', axis=1)
+
+    longstr = df.to_latex(column_format=column_format, **kwargs)
     tabularx = longstr.replace(
         '{tabular}', '{tabularx}').replace(
         'begin{tabularx}', 'begin{tabularx}{%s}' % width)
@@ -115,7 +122,7 @@ class LcaModelRunner(object):
         This returns known quantities (second result index)
         :return:
         """
-        if self._publish is not None:
+        if self._publish:
             for k in self._publish:
                 yield k
         else:
@@ -123,7 +130,7 @@ class LcaModelRunner(object):
                 yield k
             for k in self.weightings:
                 yield k
-                
+
     @property
     def lcia_methods(self):
         """
@@ -326,12 +333,13 @@ class LcaModelRunner(object):
                        index=MultiIndex.from_tuples(self._qty_tuples))
         return self._finish_dt_output(dt, column_order, filename, norm=norm)
     
-    def results_to_tex(self, filename, scenario=None, format=None, **kwargs):
+    def results_to_tex(self, filename, scenario=None, format=None, sort_column=None, **kwargs):
         """
         Print summary table (scenario=None) or detail table (scenario is not None) in tabularx format
         :param filename: tex file
         :param scenario:
         :param format: temporarily set output format for TeX file
+        :param sort_column: optional integer column number to sort by
         :param kwargs:
         :return:
         """
@@ -344,7 +352,7 @@ class LcaModelRunner(object):
             df = self.scenario_summary_tbl(**kwargs)
         else:
             df = self.scenario_detail_tbl(scenario, **kwargs)
-        _tabularx_ify(df, filename)
+        tabularx_ify(df, filename, sort_column=sort_column)
 
         self.format = oldformat
 

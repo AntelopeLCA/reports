@@ -457,3 +457,26 @@ class PosNegCompareError(object):
             filename = 'pos_neg_compare.eps'
         if filename != 'none':
             save_plot(filename)
+
+    @property
+    def dataframe(self):
+        df = DataFrame((self._table_entry(k) for k in range(len(self._pna))),
+                       index=[k.name for k in self._pna])
+        mc = MultiIndex.from_tuples(((' ', 'Unit'), ('Total Incurred', 'Impacts'), ('Total Avoided', 'Impacts'),
+                                     (' ', 'Net Total')))
+        df.columns = mc
+        return df
+
+    def _table_entry(self, index):
+        """
+
+        :param index:
+        :return:
+        """
+        p = self._pos[index]
+        n = self._neg[index]
+        return {'Unit': self._pna[index].unit,
+                'Total Incurred Impact': '%3.2g' % p,
+                'Total Avoided Impact': '%3.2g' % n,
+                'Net Total': '%3.2g' % (p+n)}
+

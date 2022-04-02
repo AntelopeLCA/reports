@@ -199,9 +199,9 @@ class WaterfallChart(object):
     def int_threshold(self):
         """
         Useful only for horiz charts
-        :return: about 0.55" in axis units
+        :return: about 0.5" in axis units
         """
-        return (self._span[1] - self._span[0]) / (self._size * 1.8)
+        return (self._span[1] - self._span[0]) / (self._size * 2)
 
     '''
     def _waterfall_staging_vert(self, scenarios, stages, styles, aspect=0.1, panel_sep=0.75, **kwargs):

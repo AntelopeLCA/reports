@@ -28,7 +28,9 @@ mpl.rcParams['axes.ymargin'] = 0
 
 def _fade_color(color):
     hsv = colorsys.rgb_to_hsv(*color)
-    return colorsys.hsv_to_rgb(hsv[0], hsv[1], hsv[2]*0.8)
+    new_hue = (hsv[0] + 0.086) % 1
+
+    return colorsys.hsv_to_rgb(new_hue, hsv[1]*0.65, hsv[2]*0.6)
 
 
 def random_color(seed, sat=0.65, val=0.95, offset=14669):
@@ -97,7 +99,7 @@ class WaterfallChart(object):
     def __init__(self, *results, stages=None, color=None, color_dict=None,
                  style=None, style_dict=None,
                  include_net=True, net_name='remainder',
-                 filename=None, size=6, autorange=False, **kwargs):
+                 filename=None, size=6, autorange=False, font_size=None, **kwargs):
         """
         Create a waterfall chart that compares the stage contributions of separate LciaResult objects.
 
@@ -129,7 +131,8 @@ class WaterfallChart(object):
         :param filename: default 'waterfall_%.3s.eps' % uuid.  Enter 'none' to return (and not save) the chart
         :param size: axes size in inches (default 6") (width for horiz bars; height for vert bars)
         :param autorange: [False] whether to auto-range the results
-        :param kwargs: panel_sep [0.65in], num_format [%3.2g], bar_width [0.85]
+        :param font_size: [None] set text [numbers smaller]
+        :param kwargs: panel_sep [0.65in], num_format [%3.2g], bar_width [0.85] font_size [None]
         """
 
         self._q = results[0].quantity
@@ -138,6 +141,7 @@ class WaterfallChart(object):
         self._color_dict = color_dict or dict()
         self._style = style or None
         self._style_dict = style_dict or dict()
+        self._font_size = font_size
 
         if stages is None:
             stages = grab_stages(*results)
@@ -199,9 +203,10 @@ class WaterfallChart(object):
     def int_threshold(self):
         """
         Useful only for horiz charts
-        :return: about 0.5" in axis units
+        :return: about 0.5" in axis units (ie. 2x size), scaled up by fontsize / 10pt
         """
-        return (self._span[1] - self._span[0]) / (self._size * 2)
+        fontsize = self._font_size or 10
+        return (self._span[1] - self._span[0]) / (self._size * 2 * 10 / fontsize)
 
     '''
     def _waterfall_staging_vert(self, scenarios, stages, styles, aspect=0.1, panel_sep=0.75, **kwargs):
@@ -311,10 +316,12 @@ class WaterfallChart(object):
             else:
                 sc_name = ''
 
+            fontsize = self._font_size or 12
+
             if i == 0:
-                ax.set_title('%s [%s]\n%s' % (self._q['Name'], self._unit, sc_name), fontsize=12)
+                ax.set_title('%s [%s]\n%s' % (self._q['Name'], self._unit, sc_name), fontsize=fontsize)
             else:
-                ax.set_title('%s' % sc_name, fontsize=12)
+                ax.set_title('%s' % sc_name, fontsize=fontsize)
 
             top = bottom - _gap_hgt
 
@@ -354,6 +361,10 @@ class WaterfallChart(object):
 
         mx = 0.0
 
+        label_args = {}
+        if self._font_size:
+            label_args['fontsize'] = self._font_size - 2
+
         for i, dat in enumerate(data):
             yticks.append(center)
             style = styles[i]
@@ -372,7 +383,7 @@ class WaterfallChart(object):
 
                 # interior label
                 x = cum + (dat / 2)
-                ax.text(x, center, num_format % dat, ha='center', va='center', color=text_color)
+                ax.text(x, center, num_format % dat, ha='center', va='center', color=text_color, **label_args)
             else:
                 '''# end label positioning-- this is complicated!
                 IF the bar is positive and the result is not too far to the right, we want the label on the right
@@ -418,7 +429,7 @@ class WaterfallChart(object):
                     x = max([cum, cum + dat]) + _h_gap
                     ha = 'left'
 
-                ax.text(x, center, num_format % dat, ha=ha, va='center')
+                ax.text(x, center, num_format % dat, ha=ha, va='center', **label_args)
 
             # connector
             if cum != 0:
@@ -462,3 +473,8 @@ class WaterfallChart(object):
 
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)
+
+        ### font size
+        if self._font_size:
+            for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
+                item.set_fontsize(self._font_size)

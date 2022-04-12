@@ -313,11 +313,18 @@ class LcaModelRunner(object):
 
     @property
     def _qty_tuples(self):
-        for q in self.quantities:
-            if q.has_property('ShortName'):
-                yield q['ShortName'], q['Indicator'], q.unit
-            else:
-                yield q['Name'], q['Indicator'], q.unit
+        if all(q['Indicator'] == q.unit for q in self.quantities):
+            for q in self.quantities:
+                if q.has_property('ShortName'):
+                    yield q['ShortName'], q['Indicator']
+                else:
+                    yield q['Name'], q['Indicator']
+        else:
+            for q in self.quantities:
+                if q.has_property('ShortName'):
+                    yield q['ShortName'], q['Indicator'], q.unit
+                else:
+                    yield q['Name'], q['Indicator'], q.unit
 
     def scenario_detail_tbl(self, scenario, filename=None, column_order=None, norm=False):
         dt = DataFrame(({k.entity: self._format(k.cumulative_result)

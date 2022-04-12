@@ -30,7 +30,7 @@ def _fade_color(color):
     hsv = colorsys.rgb_to_hsv(*color)
     new_hue = (hsv[0] + 0.086) % 1
 
-    return colorsys.hsv_to_rgb(new_hue, hsv[1]*0.65, hsv[2]*0.6)
+    return colorsys.hsv_to_rgb(new_hue, hsv[1]*0.65, hsv[2]*0.8)
 
 
 def random_color(seed, sat=0.65, val=0.95, offset=14669):
@@ -137,7 +137,7 @@ class WaterfallChart(object):
 
         self._q = results[0].quantity
 
-        self._color = color or random_color(self._q.uuid)
+        self._color = color or self._q.get('color') or random_color(self._q.uuid)
         self._color_dict = color_dict or dict()
         self._style = style or None
         self._style_dict = style_dict or dict()
@@ -452,9 +452,13 @@ class WaterfallChart(object):
         ax.tick_params(axis='y', length=0)
 
         # cumsum marker
+        if self._font_size:
+            markersize = self._font_size - 2
+        else:
+            markersize = 8
         ax.plot([cum, cum], [center - 1 + 0.5*bar_width, bottom], color=_conn_color, zorder=-1, linewidth=0.5)
         ax.plot(cum, bottom - 0.4 * _low_gap, marker='v', markerfacecolor=(1, 0, 0), markeredgecolor='none',
-                markersize=8)
+                markersize=markersize)
 
         # x labels
         if abs(cum) > self.int_threshold and abs(mx) > self.int_threshold:

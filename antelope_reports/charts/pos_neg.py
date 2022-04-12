@@ -462,7 +462,7 @@ class PosNegCompareError(object):
     def dataframe(self):
         df = DataFrame((self._table_entry(k) for k in range(len(self._pna))),
                        index=[k.name for k in self._pna])
-        mc = MultiIndex.from_tuples(((' ', 'Unit'), ('Total Incurred', 'Impacts'), ('Total Avoided', 'Impacts'),
+        mc = MultiIndex.from_tuples(((' ', 'Unit'), ('Incurred', 'Impacts'), ('Avoided', 'Impacts'),
                                      (' ', 'Net Total')))
         df.columns = mc
         return df
@@ -476,7 +476,6 @@ class PosNegCompareError(object):
         p = self._pos[index]
         n = self._neg[index]
         return {'Unit': self._pna[index].unit,
-                'Total Incurred Impact': '%3.2g' % p,
-                'Total Avoided Impact': '%3.2g' % n,
+                'Incurred Impact': '%3.2g' % p,
+                'Avoided Impact': '%3.2g' % n,
                 'Net Total': '%3.2g' % (p+n)}
-

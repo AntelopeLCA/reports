@@ -157,7 +157,8 @@ def stack_bars(ax, series, hue, units, labels=None, title='Scenario Analysis', s
 
     if center_scale:
         right = max([abs(right), abs(left)])
-        left = -right
+        if left < 0:
+            left = -right
 
     data_range = right - left
     threshold = 0.07 * data_range
@@ -353,7 +354,8 @@ def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile
             units = [r[n].quantity.unit for r in results]
 
             stack_bars(ax, series, hue, units, labels=scenarios,
-                       title=quantity['Name'], subtitle=quantity['Indicator'])
+                       title=quantity['Name'], subtitle=quantity['Indicator'],
+                       center_scale=center_scale)
 
         """
         if n == 0:

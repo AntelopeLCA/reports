@@ -23,8 +23,11 @@ default_model_doc = 'model-doc.tex'
 
 
 def tex_sanitize(tex):
-    tex = re.sub('%', '\\%', tex)
-    tex = re.sub('_', '\\\\textunderscore{}', tex)  # this doesn't work bc filenames have underscores
+    try:
+        tex = re.sub('%', '\\%', tex)
+        tex = re.sub('_', '\\\\textunderscore{}', tex)  # this doesn't work bc filenames have underscores
+    except TypeError:
+        tex = tex.__class__.__name__
     return tex
 
 
@@ -438,9 +441,10 @@ xs        """
         if stages is None:
             stages = grab_stages(results)
 
-        fig = scenario_compare_figure(results, stages, **kwargs)
+        fig = scenario_compare_figure(results, stages, center_scale=True, **kwargs)
         save_plot(os.path.join(self.img_folder, self._img_fname(f_base)))
-        self._write_stage_names(f_base, stages)
+        if stages:
+            self._write_stage_names(f_base, stages)
         return fig
 
     def frag_chart_narrow(self, f_base):
@@ -754,13 +758,18 @@ xs        """
     def recurse_report(self, *fragments, quantities=None, section_names=None, scenario=None,
                        single_origin=True, **kwargs):
         """
-        Recursively generate fragment drawings for supplied fragments plus all descendents.
+        Recursively generate fragment drawings for supplied fragments plus all descendants.
         TODO: figure out a way to organize / group child fragments other than by tier.
         Current plans are to _manually edit_ fragment_data.tex to reorganize sections / hide private fragments
-        :param positional arguments are fragments at the top-level
+        :param fragments: positional arguments are fragments at the top-level
         :param quantities: optional list of quantities for LCIA (3 is about the practical limit)
         :param section_names: [None] a list of names for successive tiers
         :param scenario:
+        :param single_origin: restrict recursion to fragments in the same foreground
+        :param kwargs: stages [None] - list of stages (default is to autodetect)
+                       table [False] - draw table
+                        full [True] - if False, omit title
+                        **kwargs - passed to scenario_compare_figure
         """
         self.new_report()
         if section_names is None:

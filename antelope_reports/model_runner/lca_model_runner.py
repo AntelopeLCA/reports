@@ -286,12 +286,13 @@ class LcaModelRunner(object):
                 'result': self._format(res.total())
                  })
 
-    def _finish_dt_output(self, dt, column_order, filename, norm=False):
+    def _finish_dt_output(self, dt, column_order, filename, norm=False, _total=None):
         """
         Add a units column, order it first, and transpose
         :param dt:
         :param column_order:
         :param filename:
+        :param _total: whether to add scenario total to the dataframe- which should happen in client code
         :return:
         """
         if column_order is None:
@@ -305,6 +306,11 @@ class LcaModelRunner(object):
             dn = DataFrame({'Normalization': [l.norm() for l in self.quantities]},
                            index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
             dto = dn.append(dto)
+
+        if _total:
+            dt = DataFrame({'Total': [self._format(self.result(_total, l).total()) for l in self.quantities]},
+                           index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
+            dto = dto.append(dt)
 
         if filename is not None:
             dto.to_csv(filename, quoting=csv.QUOTE_ALL)
@@ -326,11 +332,15 @@ class LcaModelRunner(object):
                 else:
                     yield q['Name'], q['Indicator'], q.unit
 
-    def scenario_detail_tbl(self, scenario, filename=None, column_order=None, norm=False):
+    def scenario_detail_tbl(self, scenario, filename=None, column_order=None, norm=False, total=False):
         dt = DataFrame(({k.entity: self._format(k.cumulative_result)
                          for k in self.result(scenario, l).aggregate(key=self._agg).components()}
                         for l in self.quantities), index=MultiIndex.from_tuples(self._qty_tuples))
-        return self._finish_dt_output(dt, column_order, filename, norm=norm)
+        if total:
+            _total = scenario
+        else:
+            _total = None
+        return self._finish_dt_output(dt, column_order, filename, norm=norm, _total=_total)
 
     def scenario_summary_tbl(self, filename=None, column_order=None, norm=False):
         if column_order is None:

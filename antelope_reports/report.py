@@ -38,15 +38,28 @@ def frag_link_label(name):
         return tex_sanitize(name)
 
 
-def grab_stages(results):
+def grab_stages(results, sort=None):
     stages = set()
+
+    def _first_score(_comp):
+        for r in results:
+            try:
+                return r[_comp].cumulative_result
+            except KeyError:
+                continue
+        return 0
+
     for r in results:
         if isinstance(r, list):
             for k in r:
                 stages = stages.union(k.component_entities())
         else:
             stages = stages.union(r.component_entities())
-    return list(stages)
+
+    if sort is None:
+        return sorted(stages, key=_first_score, reverse=True)
+    else:
+        return sorted(stages, key=sort)
 
 
 """

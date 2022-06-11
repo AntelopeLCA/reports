@@ -1,5 +1,26 @@
 """
+OK revisiting this chart for the first time in N years-- it is actually quite nice, but two things:
+ 1- stacking different scenarios sharing the same quantity with vertically-aligned ordinate axes is not really workable
+    because the chart becomes too long.  But it is a clever idea and maybe it should be supported, just not
+    without a proper faceted chart design. i.e. this needs a long table, seaborn-style
+ 2- in fact, what would work is having charts with different quantities with horizontally aligned abcissae would be
+    great for contribution analysis
+ 3- the charts need to show uncertainty/variability per stage- this is absolutely a make-or-break feature
+
+Proposed function signature:
+
+ WaterfallChart(*results, stages=None, ...) without uncertainty
+ WaterfallChart(*(res, res_hi, res_lo), stages=None, ...) with uncertainty
+
+The outer layer needs to create a figure, then iterate through the axes
+- then a waterfall drawing class that just takes the data and draws it
+- stage labeling happens outside
+
+For now: strip out everything related to vertical stacking.
+
 Class for making waterfall charts. There is an inheritance structure to be found in these charts somewhere..
+
+
 """
 
 import matplotlib as mpl
@@ -73,7 +94,7 @@ def _data_range(data_array):
 class WaterfallChart(object):
     """
     A WaterfallChart turns a collection of LciaResult objects into a collection of waterfall graphs that share an
-    ordinal axis.
+    ordinal axis. <- this is true, just more correctly interpreted as "aligned abcissas, common ordinate"
     """
     def _stage_style(self, stage):
         if stage in self._color_dict:
@@ -132,7 +153,8 @@ class WaterfallChart(object):
         :param size: axes size in inches (default 6") (width for horiz bars; height for vert bars)
         :param autorange: [False] whether to auto-range the results
         :param font_size: [None] set text [numbers smaller]
-        :param kwargs: panel_sep [0.65in], num_format [%3.2g], bar_width [0.85] font_size [None]
+        :param kwargs: aspect: bar height per fig width [0.1]
+        panel_sep [0.65in], num_format [%3.2g], bar_width [0.85] font_size [None]
         """
 
         self._q = results[0].quantity
@@ -161,6 +183,7 @@ class WaterfallChart(object):
         ar_scale = []
         ar_units = []
 
+        # extract data from LciaResult objects-- note--=
         for res in results:
             scenarios.append(res.scenario)
             data, net = res.contrib_new(*stages, autorange=autorange)

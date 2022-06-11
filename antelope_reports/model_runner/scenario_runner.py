@@ -54,7 +54,7 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         print('traversing %s' % case)
         sc = self._params[case]
         sc_apply = sc + tuple(self.common_scenarios)
-        self._traversals = list(self._model.traverse(sc_apply))
+        self._traversals[case] = list(self._model.traverse(sc_apply))
 
     def _recalculate_case(self, case, **kwargs):
         self._traverse_case(case)

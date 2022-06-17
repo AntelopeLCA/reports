@@ -45,12 +45,12 @@ class QuickAndEasy(object):
             return hits[0]
 
     @classmethod
-    def by_name(cls, cat, fg_name, terms=None):
+    def by_name(cls, cat, fg_name, terms=None, **kwargs):
         try:
             fg = cat.foreground(fg_name, reset=True)
         except NoSuchForeground:
             fg = cat.create_foreground(fg_name)
-        return cls(fg, terms=terms)
+        return cls(fg, terms=terms, **kwargs)
 
     def set_terms(self, terms):
         if terms:

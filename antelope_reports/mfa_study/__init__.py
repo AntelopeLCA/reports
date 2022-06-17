@@ -11,5 +11,5 @@ done with an explicit mapping of flow to route.
 
 In fact, the flow is supposed to plug into a MARKET of routes.
 """
-from .lc_mfa_study import NestedLcaStudy
+from .lc_mfa_study import NestedLcaStudy, DuplicateRoute
 from .dynamic_unit_study import DynamicUnitLcaStudy

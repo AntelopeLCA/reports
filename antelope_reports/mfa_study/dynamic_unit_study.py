@@ -79,6 +79,7 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
             self._fg.observe(d)  # lock in the 1.0 exchange value
             d.to_foreground()
             rl = self._fg.new_fragment(self.reference_material, 'Output', parent=d, exchange_value=1.0, external_ref='Unit Logistics')
+            rl.to_foreground()
             self._fg.observe(rl)  # lock in the 1.0 exchange value
 
             self._fg.observe(self.activity_container, termination=unit, scenario='Unit')
@@ -111,17 +112,22 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
         parent = self._fg.get('Unit - Dynamic Sinks')
         return self._add_unit_knob(knob, sink, 'Output', parent, descend, term_map)
 
-    def add_unit_supply(self, knob, supply, descend=False, term_map=None):
+    def add_unit_supply(self, knob, supply, direction='Input', descend=False, term_map=None):
         """
-
+        In the current construction, supply knobs MUST be reported PER kg of flow through the dynamic unit.
+        
+        (alternative design would be to make the dynamic supply a child of the dynamic unit, and they would be 
+        absolute amounts per unit.) 
+        
         :param knob:
         :param supply:
+        :param direction: default Input
         :param descend: [False] whether the traversal should descend [True] or aggregate [False] the knob
         :param term_map:
         :return:
         """
         parent = self._fg.get('Unit - Dynamic Supplies')
-        return self._add_unit_knob(knob, supply, 'Input', parent, descend, term_map)
+        return self._add_unit_knob(knob, supply, direction, parent, descend, term_map)
 
     def add_logistics_route(self, flow, provider, descend=False, term_map=None, **kwargs):
         c = super(DynamicUnitLcaStudy, self).add_logistics_route(flow, provider, descend=descend, **kwargs)

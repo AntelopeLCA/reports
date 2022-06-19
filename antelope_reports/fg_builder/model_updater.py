@@ -3,6 +3,61 @@ from antelope_foreground.entities.fragments import InvalidParentChild
 from antelope import EntityNotFound, UnknownOrigin
 
 
+from pandas import to_numeric
+
+
+def prepare_dataframe(df):
+    return df.apply(to_numeric).sort_values(df.columns[0])
+
+
+def write_results_dataframe_to_gsheet(gsheet, sheetname, df, clear_sheet=True, write_header=True, header_levels=None,
+                                      fillna='NA', write_index=True):
+    """
+
+    :param gsheet: a GoogleSheetReader
+    :param sheetname: sheet to write to or create
+    :param df: sorted, prepared data
+    :param clear_sheet: [True]
+    :param write_header: [True] whether to write header (False: leave it standing)
+    :param header_levels: number of header levels to write. Must be <= nlevels
+    :param fillna:
+    :param write_index:
+    :return:
+    """
+
+    ncol = len(df.columns)
+    if header_levels is None or header_levels > df.columns.nlevels:
+        header_levels = df.columns.nlevels
+
+    if sheetname in gsheet.sheet_names():
+        # start by clearing the sheet- with or without headers
+        if clear_sheet:
+            if write_header:
+                gsheet.clear_region(sheetname)
+            else:
+                gsheet.clear_region(sheetname, start_row=header_levels)
+        else:
+            if write_header:
+                gsheet.clear_region(sheetname, end_col=ncol, end_row=header_levels-1)
+    else:
+        gsheet.create_sheet(sheetname)
+
+    #then populate
+    def _row_gen(_df):
+        for _i, row in _df.fillna(fillna).iterrows():
+            if write_index:
+                yield [_i] + list(row.values)
+            else:
+                yield list(row.values)
+
+    if write_header:
+        for i in range(header_levels):
+            h = [''] + list(df.columns.get_level_values(i))
+            gsheet.write_row(sheetname, i, h)
+    gsheet.write_rectangle_by_rows(sheetname, _row_gen(df), start_row=header_levels)
+
+
+
 class XlsxForegroundUpdater(XlsxUpdater):
     """
     This subclass introduces the ability to read a ModelFlows sheet for both flows and fragments.  A "flows" sheet
@@ -238,3 +293,29 @@ class XlsxForegroundUpdater(XlsxUpdater):
 
     def get_context(self, cx):
         return self.ar.context(cx)
+
+    '''
+    parameters
+    read + update sheet
+    '''
+    def read_parameters(self, update_default=False):
+        """
+        Apply all read parameters to the model.
+        :param update_default: whether to reset default (observed) values as well
+        :return:
+        """
+        sh, headers = self._sheet_accessor('parameters')
+        if sh is None:
+            return
+
+        for row in range(1, sh.nrows):
+            rowdata = {headers[i]: self._grab_value(k) for i, k in enumerate(sh.row(row))}
+            units = rowdata.pop('flow_unit', None)
+            knob = self._fg[rowdata.pop('parameter', None)]
+            if knob:
+                if update_default:
+                    self._fg.observe(knob, exchange_value=rowdata.pop('default'), units=units)
+
+
+
+

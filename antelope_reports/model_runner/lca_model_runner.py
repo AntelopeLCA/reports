@@ -19,7 +19,11 @@ def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', s
     if sort_column is not None:
         # this shenanigan is necessary because tex output is often string-ified for clean formatting
         df['sort'] = df.iloc[:,sort_column].apply(float)
-        df = df.sort_values('sort', ascending=False).drop('sort', axis=1)
+        try:
+            df = df.sort_values('sort', ascending=False).drop('sort', axis=1)
+        except ValueError:
+            print('Unable to sort values~~ sorry')
+            df = df.drop('sort', axis=1)
 
     longstr = df.to_latex(column_format=column_format, **kwargs)
     tabularx = longstr.replace(

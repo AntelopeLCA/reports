@@ -10,6 +10,12 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
     """
     @staticmethod
     def _scenario_tuple(arg):
+        """
+        Translates None, strings, or tuples into tuples
+        check out all the work being done by that one comma
+        :param arg:
+        :return:
+        """
         if arg:
             if isinstance(arg, tuple):
                 return arg

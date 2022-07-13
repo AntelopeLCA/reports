@@ -535,7 +535,7 @@ xs        """
 
             for r in results_inner:
                 d = sum([q for q in r.contrib_query([s])])
-                if abs(d) > 0.1 * r.range():
+                if abs(d) > 0.1 * r.span:
                     chart += ' & \\sffamily \\textbf{%8.2e} ' % d
                 elif d == 0:
                     chart += ' & -- '

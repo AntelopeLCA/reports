@@ -315,6 +315,11 @@ def scenario_compare_figure(results, stages, hues=None, scenarios=None, savefile
      an m-array of n-arrays of LciaResult objects. Creates an n-subplot figure of m-stacked pos/neg bars, each
      featuring k stages
 
+     this needs to be done vertical, with the stages to the side
+
+     or else the waterfall charts need to be scaled
+     waterfall wasn't made that way
+
     :param results: either a n-array or a m-by-n array of results
     :param stages: k query terms to results
     :param hues: for n quantities represented (quick-compute from UUID)

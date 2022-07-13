@@ -27,8 +27,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import colorsys
 from itertools import accumulate
+from collections import defaultdict
 
-from math import floor
+# from math import floor
 
 from .base import save_plot, net_color
 
@@ -71,8 +72,8 @@ def grab_stages(*results, sort=None):
             except KeyError:
                 continue
         return 0
-    for r in results:
-        stages = stages.union(r.keys())
+    for i in results:
+        stages = stages.union(i.keys())
     if sort is None:
         return sorted(stages, key=_first_score, reverse=True)
     else:
@@ -100,7 +101,8 @@ class WaterfallChart(object):
         if stage in self._color_dict:
             this_style = {'color': self._color_dict[stage]}
         else:
-            this_style = {'color': self._color}
+            color = self._color or self._q.get('color') or random_color(self._q.uuid)
+            this_style = {'color': color}
         if stage in self._style_dict:
             this_style.update(self._style_dict[stage])
         else:
@@ -108,19 +110,11 @@ class WaterfallChart(object):
                 this_style.update(self._style)
         return this_style
 
-    def _adjust_autorange(self, autorange, autounits):
-        the_max = next(i for i, x in enumerate(autorange) if x == max(autorange))
-        the_max_range = autorange[the_max]
-        self._unit = autounits[the_max]
-        for i, x in enumerate(autorange):
-            if i != the_max:
-                factor = the_max_range / x
-                self._d[i] = [k * factor for k in self._d[i]]
-
     def __init__(self, *results, stages=None, color=None, color_dict=None,
                  style=None, style_dict=None,
                  include_net=True, net_name='remainder',
-                 filename=None, size=6, autorange=False, font_size=None, **kwargs):
+                 filename=None, size=6, autorange=False, font_size=None,
+                 aspect=0.1, case_sep=2.1, col_sep=0.25, **kwargs):
         """
         Create a waterfall chart that compares the stage contributions of separate LciaResult objects.
 
@@ -137,7 +131,7 @@ class WaterfallChart(object):
 
         Each bar is drawn in the same default color, unless
         :param results: positional parameters must all be LciaResult objects having the same quantity
-        :param stages:
+        :param stages: probably best left blank
 
         :param color:
         :param color_dict:
@@ -146,7 +140,7 @@ class WaterfallChart(object):
         :param style_dict: dict of dicts for custom styles
 
         :param include_net: [True] whether to include a net-result bar, if a discrepancy exists between the stage query
-         and the total result
+         and the total result. This is ignored- a discrepancy is always reported
         :param net_name: ['remainder'] what to call the net-result bar
 
         :param filename: default 'waterfall_%.3s.eps' % uuid.  Enter 'none' to return (and not save) the chart
@@ -154,69 +148,334 @@ class WaterfallChart(object):
         :param autorange: [False] whether to auto-range the results
         :param font_size: [None] set text [numbers smaller]
         :param kwargs: aspect: bar height per fig width [0.1]
-        panel_sep [0.65in], num_format [%3.2g], bar_width [0.85] font_size [None]
+        case_sep [2.1 bar widths], col_sep=0.25in, num_format [%3.2g], bar_width [0.85] font_size [None]
         """
 
-        self._q = results[0].quantity
+        self._qs = []
+        self._cases = []
+        self._res_by_case = defaultdict(list)
+        self._res_by_q = defaultdict(list)
+        for res in results:
+            if res.quantity not in self._qs:
+                self._qs.append(res.quantity)
+            if res.scenario not in self._cases:
+                self._cases.append(res.scenario)
+            self._res_by_case[res.scenario].append(res)
+            self._res_by_q[res.quantity].append(res)
 
-        self._color = color or self._q.get('color') or random_color(self._q.uuid)
+        self._color = color  # or self._q.get('color') or random_color(self._q.uuid)
         self._color_dict = color_dict or dict()
         self._style = style or None
         self._style_dict = style_dict or dict()
         self._font_size = font_size
+        fontsize = self._font_size or 12
 
         if stages is None:
-            stages = grab_stages(*results)
+            stages = {case: grab_stages(*ress) for case, ress in self._res_by_case.items()}
 
-        if filename is None:
-            filename = 'waterfall_%.3s.eps' % self._q.uuid
+        self._stages_by_case = stages
 
-        styles = []
-        _stages = []
-        for stage in stages:
-            _stages.append(stage)
-            styles.append(self._stage_style(stage))
-
-        data_array = []
-        scenarios = []
-        _net_flag = False
-        ar_scale = []
-        ar_units = []
+        self._include_net = dict()
+        self._net_name = net_name
 
         # extract data from LciaResult objects-- note--=
-        for res in results:
-            scenarios.append(res.scenario)
-            data, net = res.contrib_new(*stages, autorange=autorange)
-            ar_scale.append(res.autorange)
-            ar_units.append(res.unit)
-            self._unit = res.unit  # only need to correct this if autounits are not all the same
+        for case in self._cases:
+            net_flag = False
+            for res in self._res_by_case[case]:
+                data, net = res.contrib_new(*self._stages_by_case[case], autorange=autorange)
+                _range = _data_range([data])
+                if abs(net) * 1e8 > (_range[1] - _range[0]):
+                    # only include remainder if it is greater than 10 ppb
+                    net_flag = True
+                    break
+            nf = net_flag and include_net
+            self._include_net[case] = nf
 
-            _span = _data_range([data])
-            if abs(net) * 1e8 > (_span[1] - _span[0]):
-                # only include remainder if it is greater than 10 ppb
-                _net_flag = True
-                data.append(net)
-            data_array.append(data)
+        wid = 1 / len(self._qs)
 
-        if _net_flag and include_net:
-            _stages.append(net_name)
-            if net_name not in self._color_dict:
-                self._color_dict[net_name] = net_color
-            if net_name not in self._style_dict:
-                self._style_dict[net_name] = net_style
-            styles.append(self._stage_style(net_name))
+        self._size = size * wid
+        self._q = None
+        self._ax = dict()
+        self._span = (0, 0)
 
-        self._d = data_array
-        self._span = _data_range(self._d)
-        self._size = size
+        stage_count = sum(len(k) for k in self._stages_by_case.values())
+        stage_count += sum(int(k) for k in self._include_net.values())
 
-        # need to deal with inconsistent autoranges
-        if len(set(ar_scale)) != 1:
-            self._adjust_autorange(ar_scale, ar_units)
+        height = self._size * aspect * ( stage_count + case_sep * len(self._cases) )
 
-        self._fig = self._waterfall_staging_horiz(scenarios, _stages, styles, **kwargs)
+        self._fig = plt.figure(figsize=[size, height])
+
+        for i, q in enumerate(self._qs):
+            self._q = q
+            self._unit = q.unit
+            self._span = [k * 1.05 for k in _data_range([k.range() for k in self._res_by_q[q]])]
+
+            ax_pos = [wid * i, 0, (wid - col_sep/size), 1]
+
+            ax = self._fig.add_axes(ax_pos)
+
+            ax.invert_yaxis()
+            ax.spines['top'].set_visible(False)
+            ax.spines['bottom'].set_visible(True)
+            ax.spines['bottom'].set_linewidth(2)
+            ax.spines['left'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.tick_params(labelsize=10)
+            ax.tick_params(axis='y', length=0)
+            ax.set_xlim(self._span)
+
+            self._ax[q] = ax
+
+            start = 0
+            yticks = []
+            stgs = []
+
+            case_res = dict()
+            for res in self._res_by_q[q]:
+                if res.scenario in case_res:
+                    raise KeyError('Multiple results for case %s, quantity %s' % (res.scenario, q))
+                case_res[res.scenario] = res
+
+            for case in self._cases:
+                # write scenario name on the left if there are multiple scenarios
+                if i == 0:
+                    if len(self._cases) > 1:
+                        ax.text(0, start - 0.5, '%s ' % case, ha='right', fontsize=fontsize, fontweight='bold')
+                start, yt = self._waterfall_case_horiz(ax, case_res[case], start, **kwargs)
+                yticks.extend(yt)
+                stgs.extend(self._stages_by_case[case])
+                if self._include_net[case]:
+                    stgs.append(self._net_name)
+
+                start += case_sep
+                # if len(self._cases) > 1:
+                # add scenario name text
+
+            yticks.append(yticks[-1] + case_sep)
+            stgs.append('')
+
+            if len(self._cases) == 1:
+                # scenario name in title
+                sc_name = self._cases[0] or ''
+                ax.set_title('%s\n%s' % (self._q['Name'], sc_name), fontsize=fontsize)
+            else:
+                # scenario name handled above
+                ax.set_title('%s' % self._q['Name'], fontsize=fontsize)
+
+            if i == 0:
+                ax.set_yticks(yticks)
+                ax.set_yticklabels(stgs)
+            else:
+                ax.set_yticks([])
+                ax.set_ylim(self._ax[self._qs[0]].get_ylim())
+
+            # vertical axis
+            ax.plot([0, 0], ax.get_ylim(), linewidth=2, color=(0, 0, 0), zorder=-1)
+
+            # x labels
+            '''
+            if abs(cum) > self.int_threshold and abs(mx) > self.int_threshold:
+                xticks = [0]
+                xticklabels = ['0']
+            else:
+                xticks = []
+                xticklabels = []
+
+            if abs(mx - cum) > self.int_threshold:
+                xticks.extend([cum, mx])
+                xticklabels.extend([num_format % cum, num_format % mx])
+            else:
+                xticks.append(cum)
+                xticklabels.append(num_format % cum)
+                
+            '''
+
+            '''
+            # add an indicator unit notation to the rightmost tick label
+            xticklabels = [_i.get_text() for _i in ax.get_xticklabels()]
+            xticks = ax.get_xticks()
+            bgst = next(_i for _i in range(len(xticks)) if xticks[_i] == max(xticks))
+            xticklabels[bgst] += ' %s' % self._unit
+            ax.set_xticks(xticks)
+            ax.set_xticklabels(xticklabels)
+            # ax.set_xticklabels(xticklabels)
+            '''
+            ax.set_xlabel(self._q.unit)
+
+            ### font size
+            if self._font_size:
+                for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
+                    item.set_fontsize(self._font_size)
+
         if filename != 'none':
+            if filename is None:
+                uus = '_'.join('%.3s' % q.uuid for q in self._qs)
+                filename = 'waterfall-%s.eps' % uus
+
             save_plot(filename)
+
+    def _waterfall_case_horiz(self, ax, res, start, num_format='%3.2g', bar_width=0.85):
+        """
+
+        :param ax:
+        :param res:
+        :param start:
+        :param num_format:
+        :param bar_width:
+        :return:
+        """
+        print('Case: %s Quantity: %s ' % (res.scenario, res.quantity))
+        _low_gap = 0.25  # this is how much space we want between the bottom bar and the axis?
+
+        fontsize = self._font_size or 12
+
+        cum = 0.0
+        center = start + 0.5 - _low_gap
+        # top = center - 0.6 * bar_width
+
+        yticks = []
+
+        data, net = res.contrib_new(*self._stages_by_case[res.scenario])  # autorange omitted
+        for i, dat in enumerate(data):
+            yticks.append(center)
+
+            style = self._stage_style(self._stages_by_case[res.scenario][i])
+
+            self._draw_one_bar_with_label(ax, style, center, cum, dat, bar_width, num_format)
+
+            cum += dat
+            center += 1
+
+        if self._include_net[res.scenario]:
+            yticks.append(center)
+            style = {'color': net_color}
+            self._draw_one_bar_with_label(ax, style, center, cum, net, bar_width, num_format)
+
+            cum += net
+            center += 1
+
+        # cumsum marker
+        if self._font_size:
+            markersize = self._font_size - 2
+        else:
+            markersize = 8
+        ax.plot([cum, cum], [center - 1 + 0.5*bar_width, center], color=(0.3, 0.3, 0.3), zorder=-1, linewidth=0.5)
+        ax.plot(cum, center - 0.4 * _low_gap, marker='v', markerfacecolor=(1, 0, 0), markeredgecolor='none',
+                markersize=markersize)
+        '''
+        Cumulative label: we want this to appear below the arrow, but we also want to correct if it is too
+        close to the vertical axis or to the edge of the axes.
+        
+        Multi-case as with the segment labels; unfortunately they are different cases.
+        
+        First: if the cum is within the threshold of the positive span, then right-align it at the positive span
+        Second: if the cum is within the threshold of the negative span, then left-align it at the negative span
+        Third: if the cum is within the threshold of 0 on the positive side, then left-align it at 0
+        Fourth: if the cum is within the threshold of 0 on the negative side, then right-align it at 0
+        Fifth: print it centered under the carat
+        
+        '''
+        tot_thresh = self.int_threshold  #  * fontsize / 10
+        if cum > self._span[1] - tot_thresh:
+            x = self._span[1]
+            ha = 'right'
+            cs = 'AAA'
+        elif abs(cum) < tot_thresh:
+            x = tot_thresh * 0.25
+            if cum < 0:
+                x *= -1
+                ha = 'right'
+                cs = 'CCC'
+            else:
+                ha = 'left'
+                cs = 'DDD'
+        elif cum < self._span[0] + tot_thresh:
+            x = self._span[0]
+            ha = 'left'
+            cs = 'BBB'
+        else:
+            cs = 'EEE'
+            x = cum
+            ha = 'center'
+        ax.text(x, center + _low_gap, num_format % cum, ha=ha, va='top', fontsize=fontsize)
+
+        return center, yticks
+
+    def _draw_one_bar_with_label(self, ax, style, center, cum, dat, bar_width, num_format):
+        _h_gap = self.int_threshold * 0.11
+        _conn_color = (0.3, 0.3, 0.3)
+
+        label_args = {}
+        if self._font_size:
+            label_args['fontsize'] = self._font_size - 2
+
+        color = style['color']
+
+        if dat < 0:
+            style['color'] = _fade_color(color)
+
+        ax.barh(center, dat, left=cum, height=bar_width, **style)
+        if num_format:
+            if self.int_threshold is not None and abs(dat) > self.int_threshold:
+                if sum(style['color'][:2]) < 0.6:
+                    text_color = (1, 1, 1)
+                else:
+                    text_color = (0, 0, 0)
+
+                # interior label
+                x = cum + (dat / 2)
+                ax.text(x, center, num_format % dat, ha='center', va='center', color=text_color, **label_args)
+            else:
+                '''# end label positioning-- this is complicated!
+                IF the bar is positive and the result is not too far to the right, we want the label on the right
+                IF the bar is too far to the right, we want the label on the left regardless of direction
+                IF the bar is too far to the left, we want the label on the right regardless of direction
+                BUT if the bar is close to 0, we want it printed on the far side from the y axis, to not overwrite
+                We know if we're here, the bar is short.  so we only need to think about one end.
+                '''
+                if cum + dat > self._span[1] - self.int_threshold:
+                    # must do left: too close to right
+                    if 0 < cum < self.int_threshold:
+                        anchor = 'zero left'
+                    else:
+                        anchor = 'left'
+                elif cum + dat < self._span[0] + self.int_threshold:
+                    # too close to left
+                    if cum < 0 and abs(cum) < self.int_threshold:
+                        anchor = 'zero right'
+                    else:
+                        anchor = 'right'
+                elif abs(cum) < self.int_threshold:
+                    if cum >= 0:
+                        anchor = 'right'
+                    else:
+                        anchor = 'left'
+                else:
+                    # not in a danger zone
+                    if dat >= 0:
+                        anchor = 'right'
+                    else:
+                        anchor = 'left'
+
+                if anchor == 'left':
+                    x = min([cum, cum + dat]) - _h_gap
+                    ha = 'right'
+                elif anchor == 'zero left':
+                    x = -_h_gap
+                    ha = 'right'
+                elif anchor == 'zero right':
+                    x = _h_gap
+                    ha = 'left'
+                else:
+                    x = max([cum, cum + dat]) + _h_gap
+                    ha = 'left'
+
+                ax.text(x, center, num_format % dat, ha=ha, va='center', **label_args)
+
+        # connector
+        if cum != 0:
+            ax.plot([cum, cum], [center - 0.5 * bar_width, center - 1 + 0.5 * bar_width],
+                    color=_conn_color, zorder=-1, linewidth=0.5)
 
     @property
     def fig(self):
@@ -354,7 +613,8 @@ class WaterfallChart(object):
             # ax.set_xticklabels(ax.get_xticklabels() + [str(self._unit)])
         return fig
 
-    def _waterfall_horiz(self, ax, data, styles, num_format='%3.2g', bar_width=0.85):
+    '''
+    def _waterfall_horiz(self, ax, num_format='%3.2g', bar_width=0.85):
         """
 
         :param ax:
@@ -391,74 +651,8 @@ class WaterfallChart(object):
         for i, dat in enumerate(data):
             yticks.append(center)
             style = styles[i]
-
-            color = style['color']
-
-            if dat < 0:
-                style['color'] = _fade_color(color)
-
-            ax.barh(center, dat, left=cum, height=bar_width, **style)
-            if self.int_threshold is not None and abs(dat) > self.int_threshold:
-                if sum(style['color'][:2]) < 0.6:
-                    text_color = (1, 1, 1)
-                else:
-                    text_color = (0, 0, 0)
-
-                # interior label
-                x = cum + (dat / 2)
-                ax.text(x, center, num_format % dat, ha='center', va='center', color=text_color, **label_args)
-            else:
-                '''# end label positioning-- this is complicated!
-                IF the bar is positive and the result is not too far to the right, we want the label on the right
-                IF the bar is too far to the right, we want the label on the left regardless of direction
-                IF the bar is too far to the left, we want the label on the right regardless of direction
-                BUT if the bar is close to 0, we want it printed on the far side from the y axis, to not overwrite
-                We know if we're here, the bar is short.  so we only need to think about one end.
-                '''
-                if cum + dat > self._span[1] - self.int_threshold:
-                    # must do left: too close to right
-                    if 0 < cum < self.int_threshold:
-                        anchor = 'zero left'
-                    else:
-                        anchor = 'left'
-                elif cum + dat < self._span[0] + self.int_threshold:
-                    # too close to left
-                    if cum < 0 and abs(cum) < self.int_threshold:
-                        anchor = 'zero right'
-                    else:
-                        anchor = 'right'
-                elif abs(cum) < self.int_threshold:
-                    if cum >= 0:
-                        anchor = 'right'
-                    else:
-                        anchor = 'left'
-                else:
-                    # not in a danger zone
-                    if dat >= 0:
-                        anchor = 'right'
-                    else:
-                        anchor = 'left'
-
-                if anchor == 'left':
-                    x = min([cum, cum + dat]) - _h_gap
-                    ha = 'right'
-                elif anchor == 'zero left':
-                    x = -_h_gap
-                    ha = 'right'
-                elif anchor == 'zero right':
-                    x = _h_gap
-                    ha = 'left'
-                else:
-                    x = max([cum, cum + dat]) + _h_gap
-                    ha = 'left'
-
-                ax.text(x, center, num_format % dat, ha=ha, va='center', **label_args)
-
-            # connector
-            if cum != 0:
-                ax.plot([cum, cum], [center - 0.5*bar_width, center - 1 + 0.5*bar_width],
-                        color=_conn_color, zorder=-1, linewidth=0.5)
-
+            self._draw_one_bar_with_label(ax, style, center, cum, dat, bar_width, num_format)
+            
             cum += dat
             if cum > mx:
                 mx = cum
@@ -505,3 +699,4 @@ class WaterfallChart(object):
         if self._font_size:
             for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
                 item.set_fontsize(self._font_size)
+    '''

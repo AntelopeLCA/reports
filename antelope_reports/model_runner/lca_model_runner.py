@@ -25,7 +25,7 @@ def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', s
             print('Unable to sort values~~ sorry')
             df = df.drop('sort', axis=1)
 
-    longstr = df.to_latex(column_format=column_format, **kwargs)
+    longstr = df.to_latex(column_format=column_format, **kwargs)  # df.style.to_latex recommended but has dependencies
     tabularx = longstr.replace(
         '{tabular}', '{tabularx}').replace(
         'begin{tabularx}', 'begin{tabularx}{%s}' % width)

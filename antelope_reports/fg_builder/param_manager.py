@@ -28,7 +28,21 @@ class ParamManager(object):
         self._xlsx.write_dataframe('parameters', df, clear_sheet=True, fillna='', write_index=False)
         self._update()
 
+    def _get_rows(self):
+        for r in range(1, self._sheet.nrows):
+            row = self._sheet.row_dict(r)
+            if 'parameter' not in row:
+                continue
+            if row.pop('origin', None) != self._fg.origin:
+                continue
+            yield row
+
     def write_scenario(self, scenario):
+        """
+        Write the specified column to the spreadsheet
+        :param scenario:
+        :return:
+        """
         if scenario in self.scenarios:
             col = next(i for i, k in enumerate(self._sheet.row(0)) if k.value == scenario)
             data = []
@@ -39,12 +53,14 @@ class ParamManager(object):
             start_row = 0
         for r in range(1, self._sheet.nrows):
             row = self._sheet.row_dict(r)
-            if row['origin'] == self._fg.origin:
+            if row.get('origin') == self._fg.origin:
                 param = row['parameter']
                 kn = self._fg[param]
                 if kn is None:
                     print('Skipping unknown parameter %s/%s' % (self._fg.origin, param))
+                    data.append(None)
                     continue
+
                 unit = row['flow_unit']
                 val = kn.exchange_value(scenario)
                 if val == kn.observed_ev:
@@ -62,10 +78,7 @@ class ParamManager(object):
 
     def apply_parameters(self):
         self._fg.clear_scenarios(terminations=False)
-        for r in range(1, self._sheet.nrows):
-            row = self._sheet.row_dict(r)
-            if row.pop('origin') != self._fg.origin:
-                continue
+        for row in self._get_rows():
             param = row.pop('parameter')
             kn = self._fg[param]
             if kn is None:
@@ -82,10 +95,7 @@ class ParamManager(object):
         :param scenario:
         :return:
         """
-        for r in range(1, self._sheet.nrows):
-            row = self._sheet.row_dict(r)
-            if row.pop('origin') != self._fg.origin:
-                continue
+        for row in self._get_rows():
             param = row.pop('parameter')
             kn = self._fg[param]
             if kn is None:

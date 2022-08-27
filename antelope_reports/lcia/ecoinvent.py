@@ -9,4 +9,4 @@ def load_ecoinvent_synonyms(cat, query):
         raise TypeError(ar, 'Wrong archive type')
     ar.load_flows()  # this loads synonyms
     for f in ar.entities_by_type('flow'):
-        cat.lcia_engine.add_flow(f)
+        cat.lcia_engine.add_flow_terms(f)

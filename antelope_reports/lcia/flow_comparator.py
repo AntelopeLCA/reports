@@ -55,6 +55,29 @@ class FlowComparator(object):
             og = None
         return fb, self._lcia_get_flowable(fb, og)
 
+    def distinct_flowables(self, _q):
+        if hasattr(_q, 'factors'):
+            fs = (self._map_item(k) for k in _q.factors())
+            _n = _q.name
+        elif hasattr(_q, 'flows'):
+            fs = (self._map_item(k) for k in _q.flows())
+            if hasattr(_q, 'origin'):
+                _n = _q.origin
+            elif hasattr(_q, 'ref'):
+                _n = _q.ref
+            else:
+                _n = _q.__class__.__name__
+        else:
+            fs = (self._map_item(k) for k in _q)
+            _n = _q.__class__.__name__
+
+        ff, ss = zip(*fs)
+        bb = set(ss)
+
+        print('%s: %d factors; %d names; %d flowables' % (_n, len(ff), len(set(ff)), len(bb)))
+
+        return bb
+
     def sort_flowables(self, _q1, _q2):
         """
         returns lcia-engine flowables in 3 sets: distinct to _q1, common to both, distinct to _q2
@@ -64,31 +87,9 @@ class FlowComparator(object):
          - map items to strings (flagging unrecognized strings
          - map strings to flowables
         """
-        def _facs_fbs_fbs(_q):
-            if hasattr(_q, 'factors'):
-                fs = (self._map_item(k) for k in _q.factors())
-                _n = _q.name
-            elif hasattr(_q, 'flows'):
-                fs = (self._map_item(k) for k in _q.flows())
-                if hasattr(_q, 'origin'):
-                    _n = _q.origin
-                elif hasattr(_q, 'ref'):
-                    _n = _q.ref
-                else:
-                    _n = _q.__class__.__name__
-            else:
-                fs = (self._map_item(k) for k in _q)
-                _n = _q.__class__.__name__
 
-            ff, ss = zip(*fs)
-            bb = set(ss)
-
-            print('%s: %d factors; %d names; %d flowables' % (_n, len(ff), len(set(ff)), len(bb)))
-
-            return bb
-
-        _s1 = _facs_fbs_fbs(_q1)
-        _s2 = _facs_fbs_fbs(_q2)
+        _s1 = self.distinct_flowables(_q1)
+        _s2 = self.distinct_flowables(_q2)
         _u = _s1.intersection(_s2)
         _d1 = _s1.difference(_u)
         _d2 = _s2.difference(_u)

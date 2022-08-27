@@ -1,6 +1,6 @@
 from xlstools import GoogleSheetReader
 
-INDEX_HEADINGS = ('Abbreviation', 'Name', 'ShortName', 'Method', 'Category', 'Indicator', 'unit', 'Comment', 'Notes')
+INDEX_HEADINGS = ('Abbreviation', 'Name', 'ShortName', 'Method', 'Category', 'Indicator', 'unit', 'uuid', 'Comment', 'Notes')
 FACTOR_HEADINGS = ('flowable', 'context', 'ref_quantity', 'ref_unit', 'locale', 'value')
 
 
@@ -12,6 +12,12 @@ class QdbGSheetClient(object):
      - assign characterization factors from the quantity to the spreadsheet
      - update quantity definition in spreadsheet
      - create a new quantity and define it in both the spreadsheet and the foreground
+
+    Other things that could be done:
+     - given a list of flow specs, return LCIA results
+     - term manager stuff
+
+    The reference Qdb could be entirely constituted from LCIA specifications and synonym specifications
 
     The essential challenge of this class is in establishing correspondence between two different information stores:
      - the local contents of the foreground
@@ -181,7 +187,7 @@ class QdbGSheetClient(object):
         sheet = self._create_or_retrieve_cf_sheet(item)
         for i in range(1, sheet.nrows):
             cf = sheet.row_dict(i)
-            value = cf['factor'] * ent.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
+            value = cf['value'] * ent.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
             # the ref unit is kg, then that's 45,000 points per kg
             ent.characterize(cf['flowable'], cf['ref_quantity'], value, context=cf['context'], locale=cf['locale'])
 
@@ -196,6 +202,8 @@ class QdbGSheetClient(object):
         """
         item, external_ref = self._update_mapping(item, external_ref)
         ent = self.fetch_quantity(item, external_ref)
+
+        self._create_or_retrieve_cf_sheet(item)
 
         data = []
         for cf in sorted(ent.factors(), key=lambda x: (x.flowable, x.context.name)):

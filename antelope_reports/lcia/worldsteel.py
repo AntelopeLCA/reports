@@ -63,7 +63,16 @@ discovered_synonyms = [
     ('Biological oxygen demand', 'biological oxygen demand (BOD)'),
     ('Chemical oxygen demand', 'chemical oxygen demand (COD)'),
     ('Nitrous oxide', 'Nitrous oxide (laughing gas)'),
-    ('chloroform', 'Trichloromethane (chloroform)')
+    ('chloroform', 'Trichloromethane (chloroform)'),
+    ('Water, river', 'River water', 'River water, regionalized'),
+    ('Cooling water to river', 'Cooling water to river, regionalized'),
+    ('Water, fresh', 'Fresh water'),
+    ('Water, ground', 'Ground water', 'Ground water, regionalized'),
+    ('Water, lake', 'Lake water', 'Lake water, regionalized'),
+    ('Lake water to turbine', 'Lake water to turbine, regionalized'),
+    ('River water to turbine', 'River water to turbine, regionalized'),
+    ('Turbined water to river', 'Turbined water to river, regionalized'),
+    ('Processed water to river', 'Processed water to river, regionalized')
 ]
 
 

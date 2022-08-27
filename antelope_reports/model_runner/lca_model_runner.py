@@ -6,7 +6,7 @@ from pandas import DataFrame, MultiIndex
 from antelope_core.lcia_results import LciaResult
 
 
-def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', sort_column=None, **kwargs):
+def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', **kwargs):
     """
     Need to figure out how to bring \tabspec in-- (answer: jinja?)
     :param df:
@@ -16,15 +16,6 @@ def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', s
     :param sort_column: optional integer column number by which to sort (most positive to most negative)
     :return:
     """
-    if sort_column is not None:
-        # this shenanigan is necessary because tex output is often string-ified for clean formatting
-        df['sort'] = df.iloc[:,sort_column].apply(float)
-        try:
-            df = df.sort_values('sort', ascending=False).drop('sort', axis=1)
-        except ValueError:
-            print('Unable to sort values~~ sorry')
-            df = df.drop('sort', axis=1)
-
     longstr = df.to_latex(column_format=column_format, **kwargs)  # df.style.to_latex recommended but has dependencies
     tabularx = longstr.replace(
         '{tabular}', '{tabularx}').replace(
@@ -103,7 +94,10 @@ class LcaModelRunner(object):
             agg_key = lambda x: x.fragment['StageName']
 
         self._agg = agg_key
-        self._seen_stages = defaultdict(set)  #reset
+        self._seen_stages = defaultdict(set)  # reset
+
+    def _scenario_index(self, scenario):
+        return scenario
 
     @property
     def scenarios(self):
@@ -290,13 +284,14 @@ class LcaModelRunner(object):
                 'result': self._format(res.total())
                  })
 
-    def _finish_dt_output(self, dt, column_order, filename, norm=False, _total=None):
+    def _finish_dt_output(self, dt, column_order, filename, norm=False, _total=None, add_row_index=False):
         """
         Add a units column, order it first, and transpose
         :param dt:
         :param column_order:
         :param filename:
         :param _total: whether to add scenario total to the dataframe- which should happen in client code
+        :param add_row_index: for detail view only: whether scenario index should be set (perhaps always?)
         :return:
         """
         if column_order is None:
@@ -306,6 +301,10 @@ class LcaModelRunner(object):
             ord_columns += [k for k in dt.columns if k not in ord_columns]  # add in anything that's missed
 
         dto = dt[ord_columns].transpose()
+
+        if add_row_index:
+            dto = dto.set_index(self._scenario_index(k) for k in ord_columns)
+
         if norm:
             dn = DataFrame({'Normalization': [l.norm() for l in self.quantities]},
                            index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
@@ -346,13 +345,13 @@ class LcaModelRunner(object):
             _total = None
         return self._finish_dt_output(dt, column_order, filename, norm=norm, _total=_total)
 
-    def scenario_summary_tbl(self, filename=None, column_order=None, norm=False):
+    def scenario_summary_tbl(self, filename=None, column_order=None, norm=False, add_row_index=False):
         if column_order is None:
             column_order = list(self.scenarios)
         dt = DataFrame(({k: self._format(self.result(k, l).total()) for k in column_order}
                         for l in self.quantities),
                        index=MultiIndex.from_tuples(self._qty_tuples))
-        return self._finish_dt_output(dt, column_order, filename, norm=norm)
+        return self._finish_dt_output(dt, column_order, filename, norm=norm, add_row_index=add_row_index)
     
     def results_to_tex(self, filename, scenario=None, format=None, sort_column=None, **kwargs):
         """
@@ -373,7 +372,17 @@ class LcaModelRunner(object):
             df = self.scenario_summary_tbl(**kwargs)
         else:
             df = self.scenario_detail_tbl(scenario, **kwargs)
-        tabularx_ify(df, filename, sort_column=sort_column)
+
+        if sort_column is not None:
+            # this shenanigan is necessary because tex output is often string-ified for clean formatting
+            df['sort'] = df.iloc[:, sort_column].apply(float)
+            try:
+                df = df.sort_values('sort', ascending=False).drop('sort', axis=1)
+            except ValueError:
+                print('Unable to sort values~~ sorry')
+                df = df.drop('sort', axis=1)
+
+        tabularx_ify(df, filename)
 
         self.format = oldformat
 

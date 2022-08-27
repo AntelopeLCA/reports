@@ -61,10 +61,13 @@ class QuickModelRunner(LcaModelRunner):
         self._models[name] = model
         self.add_scenario(name)
 
+    def _scenario_index(self, scenario):
+        model = self._models[scenario]
+        return model.name, model.flow.name, model.observed_ev, model.flow.unit
+
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         model = self._models[scenario]
         return model.fragment_lcia(lcia, **kwargs)
-
 
     def compute_results(self, lcia):
         for l in lcia:
@@ -76,8 +79,6 @@ class QuickModelRunner(LcaModelRunner):
         fname = 'details-%s-%s-%s.json' % (prefix, node, lcia.external_ref)
         with open(fname, 'w') as fp:
             json.dump(res.serialize_components(detailed=True), fp, indent=2)
-
-
 
 
 def generate_results(cat, lcia, fg_name, refs_file, out_file):

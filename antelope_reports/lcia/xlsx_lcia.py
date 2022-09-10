@@ -1,4 +1,5 @@
 from xlstools import GoogleSheetReader
+from googleapiclient.errors import HttpError
 
 INDEX_HEADINGS = ('Abbreviation', 'Name', 'ShortName', 'Method', 'Category', 'Indicator', 'unit', 'uuid', 'Comment', 'Notes')
 FACTOR_HEADINGS = ('flowable', 'context', 'ref_quantity', 'ref_unit', 'locale', 'value')
@@ -36,7 +37,7 @@ class QdbGSheetClient(object):
         self._qsheet = None
         self._qs = []  # list of indicators in sequence
         self._qd = dict()  # dict of ref to indicator
-        self._ext_ref_mapping = dict()  # custom mapping of indicator to fg external ref
+        self._ext_ref_mapping = dict()  # custom mapping of fg external ref to indicator name "item"
         self.load_quantities()
 
     @property
@@ -71,7 +72,7 @@ class QdbGSheetClient(object):
         try:
             return self._qd[item]
         except KeyError:
-            return self._ext_ref_mapping[item]
+            return self._qd[self._ext_ref_mapping[item]]
 
     def _update_mapping(self, item, external_ref=None):
         if external_ref is None:
@@ -125,7 +126,8 @@ class QdbGSheetClient(object):
         item, external_ref = self._update_mapping(item, external_ref)
         dat = {**self._qd[item]}
         if self.fg[external_ref] is None:
-            ent = self.fg.new_quantity(dat.pop('Name'), ref_unit=dat.pop('unit'), **dat)
+            ent = self.fg.new_quantity(dat.pop('Name'), ref_unit=dat.pop('unit'),
+                                       external_ref=external_ref, synonyms=(item,), **dat)
         else:
             ent = self.fg[external_ref]
             for k, v in dat.items():
@@ -171,7 +173,10 @@ class QdbGSheetClient(object):
         columns = self._factor_headings(item)
         if item not in self._xls.sheet_names():
             self._xls.create_sheet(item)
-        self._xls.write_row(item, 0, columns)
+        try:
+            self._xls.write_row(item, 0, columns)
+        except HttpError:
+            print('No write access; not updating column headings for %s' % item)
         return self._xls.sheet_by_name(item)
 
     def update_cfs(self, item, external_ref=None):
@@ -187,9 +192,10 @@ class QdbGSheetClient(object):
         sheet = self._create_or_retrieve_cf_sheet(item)
         for i in range(1, sheet.nrows):
             cf = sheet.row_dict(i)
-            value = cf['value'] * ent.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
+            rq = self.fg.get_canonical(cf['ref_quantity'])
+            value = cf['value'] * rq.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
             # the ref unit is kg, then that's 45,000 points per kg
-            ent.characterize(cf['flowable'], cf['ref_quantity'], value, context=cf['context'], locale=cf['locale'])
+            ent.characterize(cf['flowable'], rq, value, context=cf['context'], location=cf['locale'])  # why "location"?
 
         return ent
 

@@ -4,7 +4,6 @@ from antelope_reports.model_runner.lca_model_runner import tabularx_ify
 from antelope_reports.charts.pos_neg import PosNegCompareError
 
 
-
 class ResultsWriter(object):
     @property
     def unit_output(self):
@@ -100,8 +99,8 @@ class ResultsWriter(object):
 
         self._check_output_dir()
 
-    def generate_csv(self, study):
-        study.results_to_csv(self.full_output)
+    def generate_csv(self, study, scenario_order=None):
+        study.results_to_csv(self.full_output, scenarios=scenario_order)
 
     def generate_year_output(self, study_year, year, stage_order):
         # generate_pos_neg_compare(study_year)

@@ -77,6 +77,8 @@ class NestedLcaStudy(object):
         self._logis = logistics_container
         self._activ = activity_container
 
+        self.route_debug = False
+
     @property
     def data(self):
         return self._data
@@ -161,6 +163,8 @@ class NestedLcaStudy(object):
     '''
 
     def _make_single_link(self, parent, direction, child, stage_name=None):
+        if self.route_debug:
+            print('_make_single_link: %s, %s, %s' % (parent, direction, child))
         try:
             term = self.models.get(child)
         except EntityNotFound:
@@ -174,6 +178,9 @@ class NestedLcaStudy(object):
             # 'comp_dir' because new_fragment UX expects input w.r.t. fragment for reference flows
             f = self.fg.new_fragment(term.flow, comp_dir(direction))
         else:
+            if isinstance(parent, list) and len(parent) == 1:
+                print('found a list')
+                parent = parent[0]
             f = self.fg.new_fragment(term.flow, term.direction, parent=parent)
         f.terminate(term)
         if stage_name:
@@ -190,6 +197,8 @@ class NestedLcaStudy(object):
         :param stage_names:
         :return:
         """
+        if self.route_debug:
+            print('_make_link_or_links: %s, %s, %s' % (parent, direction, child_or_children))
         if isinstance(child_or_children, dict):
             if isinstance(parent, list):
                 # can't imagine this coming up, but let's let it ride
@@ -234,6 +243,8 @@ class NestedLcaStudy(object):
         :param parent: [None] for new standalone models. Can also be used to attach routes to existing parents.
         :return:
         """
+        if self.route_debug:
+            print('_make_route: %s, %s, %s' % (route, sense, parent))
         first = None
         direction = comp_dir(sense)
         if isinstance(route, str) or isinstance(route, dict):
@@ -351,6 +362,8 @@ class NestedLcaStudy(object):
         :param sense:
         :return:
         """
+        if self.route_debug:
+            print('make_market: %s, %s, %s' % (parent_or_flow, p_map, sense))
         if stage_names is None:
             stage_names = dict()
         if isinstance(p_map, str):
@@ -379,6 +392,9 @@ class NestedLcaStudy(object):
 
                 elif term.entity_type == 'fragment':
                     flow = parent.flow  # stick with market parent for conservation purposes
+
+                else:
+                    raise TypeError(term, "p_map key looks up to wrong or nothing")
 
                 if v is None:
                     c = self.fg.new_fragment(flow, direction, parent=parent, name=term['name'], balance=True)
@@ -410,6 +426,14 @@ class NestedLcaStudy(object):
     '''
     Model populating methods
     '''
+    def install_observation_model(self, prov_frag, scope=None):
+        if scope is None:
+            scope = prov_frag.get('Scope')
+            if scope is None:
+                raise ValueError('Must provide scope!')
+        self.activity_container.clear_termination(scope)
+        self.activity_container.terminate(prov_frag, scope)
+
     def add_logistics_route(self, flow, provider, descend=False, **kwargs):
         """
 

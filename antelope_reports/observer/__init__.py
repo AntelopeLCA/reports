@@ -46,6 +46,14 @@ class QuickAndEasy(object):
 
     @classmethod
     def by_name(cls, cat, fg_name, terms=None, **kwargs):
+        """
+        NOTE: this resets the foreground.  this is a bit foolish given how badly we handle reset foregrounds.
+        :param cat:
+        :param fg_name:
+        :param terms:
+        :param kwargs:
+        :return:
+        """
         try:
             fg = cat.foreground(fg_name, reset=True)
         except NoSuchForeground:

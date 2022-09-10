@@ -190,12 +190,7 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
             df.flow = bf
 
     def install_observation_model(self, prov_frag, scope=None):
-        if scope is None:
-            scope = prov_frag.get('Scope')
-            if scope is None:
-                raise ValueError('Must provide scope!')
-        self.activity_container.clear_termination(scope)
-        self.activity_container.terminate(prov_frag, scope)
+        super(DynamicUnitLcaStudy, self).install_observation_model(prov_frag, scope=scope)
 
         log_ref = logistics_fragment_ref(prov_frag)
         prov_log = self.data[log_ref]  # should also be a convention?

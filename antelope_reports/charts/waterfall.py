@@ -81,14 +81,38 @@ def grab_stages(*results, sort=None):
 
 
 def _data_range(data_array):
+    """
+
+    :param data_array:
+    :return:
+    """
     mx = 0.0
     mn = 0.0
     for i, data in enumerate(data_array):
-        for k in accumulate(data):
+        for k in accumulate(sorted(data, reverse=True)):
             if k > mx:
                 mx = k
             if k < mn:
                 mn = k
+    return mn, mx
+
+
+def _res_range(ress):
+    """
+    accepts a list of results; returns the largest and smallest data values encountered, assuming the segments are
+    presented in descending order
+    :param range_tuples:
+    :return:
+    """
+    mx = 0.0
+    mn = 0.0
+    for i, res in enumerate(ress):
+        lo = res.total()
+        hi = max(res.range())
+        if lo < mn:
+            mn = lo
+        if hi > mx:
+            mx = hi
     return mn, mx
 
 
@@ -155,6 +179,8 @@ class WaterfallChart(object):
         self._cases = []
         self._res_by_case = defaultdict(list)
         self._res_by_q = defaultdict(list)
+
+        # sort/group results by case and by quantity
         for res in results:
             if res.quantity not in self._qs:
                 self._qs.append(res.quantity)
@@ -163,6 +189,7 @@ class WaterfallChart(object):
             self._res_by_case[res.scenario].append(res)
             self._res_by_q[res.quantity].append(res)
 
+        # support limited, idiosyncratic customization of styles and colors
         self._color = color  # or self._q.get('color') or random_color(self._q.uuid)
         self._color_dict = color_dict or dict()
         self._style = style or None
@@ -170,15 +197,17 @@ class WaterfallChart(object):
         self._font_size = font_size
         fontsize = self._font_size or 12
 
+        # group stages by case
         if stages is None:
             stages = {case: grab_stages(*ress) for case, ress in self._res_by_case.items()}
 
         self._stages_by_case = stages
 
+        # prepare net-balance bar (included any time the stage query does not equal the result total
         self._include_net = dict()
         self._net_name = net_name
 
-        # extract data from LciaResult objects-- note--=
+        # extract data from LciaResult objects-- and compute net-balance
         for case in self._cases:
             net_flag = False
             for res in self._res_by_case[case]:
@@ -201,14 +230,15 @@ class WaterfallChart(object):
         stage_count = sum(len(k) for k in self._stages_by_case.values())
         stage_count += sum(int(k) for k in self._include_net.values())
 
-        height = self._size * aspect * ( stage_count + case_sep * len(self._cases) )
+        # old: height = num_ax * (self._size * aspect * num_steps) + (num_ax - 1) * panel_sep
+        height = self._size * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
 
         self._fig = plt.figure(figsize=[size, height])
 
         for i, q in enumerate(self._qs):
             self._q = q
             self._unit = q.unit
-            self._span = [k * 1.05 for k in _data_range([k.range() for k in self._res_by_q[q]])]
+            self._span = [k * 1.05 for k in _res_range([k for k in self._res_by_q[q]])]
 
             ax_pos = [wid * i, 0, (wid - col_sep/size), 1]
 
@@ -251,8 +281,9 @@ class WaterfallChart(object):
                 # if len(self._cases) > 1:
                 # add scenario name text
 
-            yticks.append(yticks[-1] + case_sep)
-            stgs.append('')
+            ## not sure why we are doing this
+            #yticks.append(yticks[-1] + case_sep)
+            #stgs.append('')
 
             if len(self._cases) == 1:
                 # scenario name in title
@@ -262,9 +293,14 @@ class WaterfallChart(object):
                 # scenario name handled above
                 ax.set_title('%s' % self._q['Name'], fontsize=fontsize)
 
+                ## not sure why we are doing this
+                #yticks.append(yticks[-1] + case_sep)
+                #stgs.append('')
+
             if i == 0:
                 ax.set_yticks(yticks)
                 ax.set_yticklabels(stgs)
+                ax.set_ylim([start, -1])
             else:
                 ax.set_yticks([])
                 ax.set_ylim(self._ax[self._qs[0]].get_ylim())
@@ -302,10 +338,12 @@ class WaterfallChart(object):
             '''
             ax.set_xlabel(self._q.unit)
 
-            ### font size
+            # font size
             if self._font_size:
                 for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
                     item.set_fontsize(self._font_size)
+                t = ax.xaxis.get_offset_text()
+                t.set_size(self._font_size)
 
         if filename != 'none':
             if filename is None:
@@ -375,26 +413,26 @@ class WaterfallChart(object):
         Fifth: print it centered under the carat
         
         '''
-        tot_thresh = self.int_threshold  #  * fontsize / 10
+        tot_thresh = self.int_threshold  # * fontsize / 10
         if cum > self._span[1] - tot_thresh:
             x = self._span[1]
             ha = 'right'
-            cs = 'AAA'
+            # cs = 'AAA'
         elif abs(cum) < tot_thresh:
             x = tot_thresh * 0.25
             if cum < 0:
                 x *= -1
                 ha = 'right'
-                cs = 'CCC'
+                # cs = 'CCC'
             else:
                 ha = 'left'
-                cs = 'DDD'
+                # cs = 'DDD'
         elif cum < self._span[0] + tot_thresh:
             x = self._span[0]
             ha = 'left'
-            cs = 'BBB'
+            # cs = 'BBB'
         else:
-            cs = 'EEE'
+            # cs = 'EEE'
             x = cum
             ha = 'center'
         ax.text(x, center + _low_gap, num_format % cum, ha=ha, va='top', fontsize=fontsize)
@@ -542,6 +580,7 @@ class WaterfallChart(object):
             ax.set_xlim([_mn, _mx])
     '''
 
+    '''
     def _waterfall_staging_horiz(self, scenarios, stages, styles,
                                  aspect=0.1, panel_sep=0.65,
                                  **kwargs):
@@ -612,6 +651,7 @@ class WaterfallChart(object):
             # ax.set_xticks(ax.get_xticks() + [_mx])
             # ax.set_xticklabels(ax.get_xticklabels() + [str(self._unit)])
         return fig
+    '''
 
     '''
     def _waterfall_horiz(self, ax, num_format='%3.2g', bar_width=0.85):

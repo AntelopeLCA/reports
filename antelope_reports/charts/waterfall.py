@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import colorsys
 from itertools import accumulate
 from collections import defaultdict
+from math import ceil
 
 # from math import floor
 
@@ -101,7 +102,7 @@ def _res_range(ress):
     """
     accepts a list of results; returns the largest and smallest data values encountered, assuming the segments are
     presented in descending order
-    :param range_tuples:
+    :param ress:
     :return:
     """
     mx = 0.0
@@ -121,6 +122,8 @@ class WaterfallChart(object):
     A WaterfallChart turns a collection of LciaResult objects into a collection of waterfall graphs that share an
     ordinal axis. <- this is true, just more correctly interpreted as "aligned abcissas, common ordinate"
     """
+    _draw_ylabel = (0,)
+
     def _stage_style(self, stage):
         if stage in self._color_dict:
             this_style = {'color': self._color_dict[stage]}
@@ -134,11 +137,73 @@ class WaterfallChart(object):
                 this_style.update(self._style)
         return this_style
 
+    def _create_figure_and_axes(self, size, aspect, case_sep):
+        """
+        Computes the figure size based on the content and creates the axes
+        :param size: width of figure in inches
+        :param aspect: ratio of bar height to axes width
+        :param case_sep: vertical gap between cases in multiples of bar height
+        :return:
+        """
+        stage_count = sum(len(k) for k in self._stages_by_case.values())
+        stage_count += sum(int(k) for k in self._include_net.values())
+
+        # decision point: are we doing a standard cases x quantities single row, or a quantities grid?
+        # decide based on the aspect of the final chart.
+        # old: height = num_ax * (self._size * aspect * num_steps) + (num_ax - 1) * panel_sep
+        wid = 1 / len(self._qs)
+        height = (size * wid) * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
+
+        if (size / height) > 3 and len(self._qs) > 4:
+            # overrule! do a Kx4 grid of axes
+            n_cols = 4  # maybe support
+            wid = 1 / n_cols
+            n_rows = ceil(len(self._qs) / n_cols)
+            row_height = (size * wid) * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
+            height = row_height * n_rows + self._row_sep * (n_rows - 1)
+            ht = 1 / n_rows
+
+            print('Creating %dx%d Layout' % (n_rows, n_cols))
+            self._draw_ylabel = tuple(i for i in range(len(self._qs)) if i % n_cols == 0)
+
+            def _ax_pos(_i):
+                _lt = wid * (_i % n_cols)
+                _bt = ht * (n_rows - 1 - (_i // n_cols))
+                return [_lt, _bt, (wid - self._col_sep / size), (ht - self._row_sep / size)]
+
+        else:
+            # normal- do case x quantity
+            print('Creating 1x%d Layout' % (len(self._qs)))
+
+            def _ax_pos(_i):
+                return [wid * _i, 0, (wid - self._col_sep / size), 1]
+
+        self._size = size * wid
+        print('Creating figure with size %.2f x %.2f' % (size, height))
+        self._fig = plt.figure(figsize=[size, height])
+
+        for i in range(len(self._qs)):
+
+            # ax_pos = [wid * i, 0, (wid - self._col_sep / size), 1]
+
+            ax = self._fig.add_axes(_ax_pos(i))
+
+            ax.invert_yaxis()
+            ax.spines['top'].set_visible(False)
+            ax.spines['bottom'].set_visible(True)
+            ax.spines['bottom'].set_linewidth(2)
+            ax.spines['left'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.tick_params(labelsize=10)
+            ax.tick_params(axis='y', length=0)
+
+            self._ax[self._qs[i]] = ax
+
     def __init__(self, *results, stages=None, color=None, color_dict=None,
                  style=None, style_dict=None,
                  include_net=True, net_name='remainder',
                  filename=None, size=6, autorange=False, font_size=None,
-                 aspect=0.1, case_sep=2.1, col_sep=0.25, **kwargs):
+                 aspect=0.1, case_sep=2.1, row_sep=None, col_sep=0.25, **kwargs):
         """
         Create a waterfall chart that compares the stage contributions of separate LciaResult objects.
 
@@ -172,7 +237,7 @@ class WaterfallChart(object):
         :param autorange: [False] whether to auto-range the results
         :param font_size: [None] set text [numbers smaller]
         :param kwargs: aspect: bar height per fig width [0.1]
-        case_sep [2.1 bar widths], col_sep=0.25in, num_format [%3.2g], bar_width [0.85] font_size [None]
+        case_sep [2.1 bar widths], col_sep=0.25in, num_format [%3.2g], bar_width [0.85] font_size [None] row_sep [None]
         """
 
         self._qs = []
@@ -220,41 +285,23 @@ class WaterfallChart(object):
             nf = net_flag and include_net
             self._include_net[case] = nf
 
-        wid = 1 / len(self._qs)
-
-        self._size = size * wid
+        self._row_sep = row_sep or (size / 10)  # real gap in inches between rows
+        self._col_sep = col_sep  # real gap in inches between panels
+        self._size = 0.0  # real axes width in inches, set in _create_figure()
         self._q = None
         self._ax = dict()
-        self._span = (0, 0)
+        self._fig = None
+        self._span = (0, 0)  # for current axes only
 
-        stage_count = sum(len(k) for k in self._stages_by_case.values())
-        stage_count += sum(int(k) for k in self._include_net.values())
-
-        # old: height = num_ax * (self._size * aspect * num_steps) + (num_ax - 1) * panel_sep
-        height = self._size * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
-
-        self._fig = plt.figure(figsize=[size, height])
+        self._create_figure_and_axes(size, aspect, case_sep)
 
         for i, q in enumerate(self._qs):
             self._q = q
             self._unit = q.unit
             self._span = [k * 1.05 for k in _res_range([k for k in self._res_by_q[q]])]
 
-            ax_pos = [wid * i, 0, (wid - col_sep/size), 1]
-
-            ax = self._fig.add_axes(ax_pos)
-
-            ax.invert_yaxis()
-            ax.spines['top'].set_visible(False)
-            ax.spines['bottom'].set_visible(True)
-            ax.spines['bottom'].set_linewidth(2)
-            ax.spines['left'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.tick_params(labelsize=10)
-            ax.tick_params(axis='y', length=0)
+            ax = self._ax[q]
             ax.set_xlim(self._span)
-
-            self._ax[q] = ax
 
             start = 0
             yticks = []
@@ -263,12 +310,13 @@ class WaterfallChart(object):
             case_res = dict()
             for res in self._res_by_q[q]:
                 if res.scenario in case_res:
+                    # the proper approach to this is to use multiple entries to draw sensitivity bars
                     raise KeyError('Multiple results for case %s, quantity %s' % (res.scenario, q))
                 case_res[res.scenario] = res
 
             for case in self._cases:
                 # write scenario name on the left if there are multiple scenarios
-                if i == 0:
+                if i in self._draw_ylabel:
                     if len(self._cases) > 1:
                         ax.text(0, start - 0.5, '%s ' % case, ha='right', fontsize=fontsize, fontweight='bold')
                 start, yt = self._waterfall_case_horiz(ax, case_res[case], start, **kwargs)
@@ -277,13 +325,16 @@ class WaterfallChart(object):
                 if self._include_net[case]:
                     stgs.append(self._net_name)
 
-                start += case_sep
+                if case != self._cases[-1]:
+                    start += case_sep
+                else:
+                    start += 1.2
                 # if len(self._cases) > 1:
                 # add scenario name text
 
-            ## not sure why we are doing this
-            #yticks.append(yticks[-1] + case_sep)
-            #stgs.append('')
+            # ## not sure why we are doing this
+            # yticks.append(yticks[-1] + case_sep)
+            # stgs.append('')
 
             if len(self._cases) == 1:
                 # scenario name in title
@@ -293,11 +344,11 @@ class WaterfallChart(object):
                 # scenario name handled above
                 ax.set_title('%s' % self._q['Name'], fontsize=fontsize)
 
-                ## not sure why we are doing this
-                #yticks.append(yticks[-1] + case_sep)
-                #stgs.append('')
+                # ## not sure why we are doing this
+                # yticks.append(yticks[-1] + case_sep)
+                # stgs.append('')
 
-            if i == 0:
+            if i in self._draw_ylabel:
                 ax.set_yticks(yticks)
                 ax.set_yticklabels(stgs)
                 ax.set_ylim([start, -1])
@@ -435,7 +486,9 @@ class WaterfallChart(object):
             # cs = 'EEE'
             x = cum
             ha = 'center'
-        ax.text(x, center + _low_gap, num_format % cum, ha=ha, va='top', fontsize=fontsize)
+
+        total_format = num_format or '%.3g'
+        ax.text(x, center + _low_gap, total_format % cum, ha=ha, va='top', fontsize=fontsize)
 
         return center, yticks
 
@@ -445,7 +498,7 @@ class WaterfallChart(object):
 
         label_args = {}
         if self._font_size:
-            label_args['fontsize'] = self._font_size - 2
+            label_args['fontsize'] = self._font_size * 0.8
 
         color = style['color']
 

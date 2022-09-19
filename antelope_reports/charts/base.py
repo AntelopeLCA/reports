@@ -4,6 +4,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from textwrap import wrap
 
+import os
+
 # grumble something about breaking styles for no good reason with 2.0.0
 mpl.rcParams['patch.force_edgecolor'] = True
 mpl.rcParams['errorbar.capsize'] = 3
@@ -114,7 +116,15 @@ def has_pos_neg(res):
     return False
 
 
-def save_plot(file, close_after=True, transparent=True, format='eps'):
+def save_plot(file, close_after=True, transparent=True, format=None):
+
+    if format is None:
+        n, f = os.path.splitext(file)
+        if f:
+            format = f[1:]
+        else:
+            format = 'eps'
+
     plt.savefig(file, format=format, bbox_inches='tight', transparent=transparent)
     if close_after:
         plt.close()

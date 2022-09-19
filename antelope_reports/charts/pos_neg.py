@@ -71,7 +71,7 @@ class _PosNegAxes(object):
         """
         return (self._span[1] - self._span[0]) * self._ar_scale / (self._size * 18)
 
-    def draw_pos_neg(self, x, pos, neg, num_format, pos_err=0):
+    def draw_pos_neg(self, x, pos, neg, num_format, pos_err=0.0):
 
         pos *= self._ar_scale
         pos_top = pos + pos_err * self._ar_scale
@@ -397,13 +397,14 @@ class PosNegCompareError(object):
                 _pos_est = _pos
                 _neg_est = _neg
 
+            nz_pos = _pos or 1.0
             if _pos + _neg_est < 0:
-                _ratios.append(-1 * (_pos + _neg_est) / _pos)
+                _ratios.append(-1 * (_pos + _neg_est) / nz_pos)
             else:
                 _ratios.append(0)
 
-            if _pos_est > _pos:
-                _overdraw.append(_pos_est / _pos)
+            if 1:  # _pos_est > _pos:
+                _overdraw.append(_pos_est / nz_pos)
 
         print(_ratios)
         print(_overdraw)

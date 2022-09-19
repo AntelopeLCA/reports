@@ -195,7 +195,8 @@ class QdbGSheetClient(object):
             rq = self.fg.get_canonical(cf['ref_quantity'])
             value = cf['value'] * rq.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
             # the ref unit is kg, then that's 45,000 points per kg
-            ent.characterize(cf['flowable'], rq, value, context=cf['context'], location=cf['locale'])  # why "location"?
+            ent.characterize(cf['flowable'], rq, value, context=cf['context'], location=cf['locale'],  # why "location"?
+                             overwrite=True)
 
         return ent
 

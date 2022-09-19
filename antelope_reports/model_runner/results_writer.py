@@ -113,11 +113,12 @@ class ResultsWriter(object):
 
         study.results_to_tex(self.unit_table, column_order=scenario_order, format='%.2e', sort_column=0)  # DISP_QS via runner
 
-    def pos_neg_chart(self, runner, scenario, qs=None):
+    def pos_neg_chart(self, runner, scenario, qs=None, table=True):
         if qs is None:
             qs = list(runner.quantities)
         pn = PosNegCompareError(*(runner.sens_result(scenario, q) for q in qs), filename=self.pos_neg_eps(scenario))
-        tabularx_ify(pn.dataframe, column_format='ll *{3}X', filename=self.pos_neg_tex(scenario), multicolumn=False)
+        if table:
+            tabularx_ify(pn.dataframe, column_format='ll *{3}X', filename=self.pos_neg_tex(scenario), multicolumn=False)
 
     def activity_documenter(self, lca, *scenarios):
         raise NotImplementedError

@@ -16,7 +16,7 @@ def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', *
     :param sort_column: optional integer column number by which to sort (most positive to most negative)
     :return:
     """
-    longstr = df.to_latex(column_format=column_format, **kwargs)  # df.style.to_latex recommended but has dependencies
+    longstr = df.style.to_latex(column_format=column_format, **kwargs)  # df.style.to_latex recommended but has dependencies
     tabularx = longstr.replace(
         '{tabular}', '{tabularx}').replace(
         'begin{tabularx}', 'begin{tabularx}{%s}' % width)
@@ -397,3 +397,15 @@ class LcaModelRunner(object):
         :return: LciaResult
         """
         return NotImplemented
+
+    def to_dataframe(self, index=None, **kwargs):
+        """
+        A minimal dataframe that largely duplicates scenario_summary_tbl()
+        :param index:
+        :param kwargs:
+        :return:
+        """
+        if index is None:
+            index = list(self.quantities)
+        return DataFrame(({case: self._results[case, q].total() for case in self.scenarios} for q in self.quantities),
+                         index=index, **kwargs)

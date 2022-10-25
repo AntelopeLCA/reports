@@ -175,8 +175,18 @@ class PosNegChart(object):
             _pos = 0.0
             _neg = 0.0
             for c in arg.keys():
-                val = arg[c].cumulative_result
-                if val > 0:
+                comp = arg[c]
+                val = comp.cumulative_result
+
+                # need to check sign of fragment flow, not sign of result, if possible
+                # discriminant: what determines the sign
+                if hasattr(comp.entity, 'node_weight'):
+                    # note: this fails on aggregated results because they don't have FragmentFlow entities
+                    disc = comp.entity.node_weight
+                else:
+                    disc = val
+
+                if disc > 0:
                     _pos += val
                 else:
                     _neg += val

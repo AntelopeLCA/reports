@@ -8,7 +8,7 @@ across methods and data sources.
 
 from .lcia_eval import LciaEval
 from .flow_comparator import FlowComparator
-from .screening import process_screen, substance_screen, show_top_n
+# from .screening import process_screen, substance_screen, show_top_n
 
 
 from synonym_dict import MergeError

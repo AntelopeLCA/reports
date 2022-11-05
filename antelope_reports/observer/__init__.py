@@ -30,8 +30,8 @@ def _flow_to_ref(name):
 
 
 class QuickAndEasy(object):
-    @staticmethod
-    def _get_one(hits, strict=False):
+
+    def _get_one(self, hits, strict=False, **kwargs):
         hits = list(hits)
         if len(hits) == 1:
             return hits[0]

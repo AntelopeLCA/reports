@@ -59,8 +59,8 @@ class QuickAndEasy(object):
      as we get with the google doc, we would have to write the change in-memory, save the change to disk, and then
      re-load the file.  That is all upstream in xlstools; for now we are sticking with google docs only.
     """
-    @staticmethod
-    def _get_one(hits, strict=False):
+
+    def _get_one(self, hits, strict=False, **kwargs):
         hits = list(hits)
         if len(hits) == 1:
             return hits[0]

@@ -95,6 +95,13 @@ class QuickAndEasy(object):
                 self._terms[k] = self.fg.catalog_ref(*v)
 
     def __init__(self, fg, terms=None, xlsx=None):
+        """
+        A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
+        origin + external ref, and an optional XlrdLike spreadsheet
+        :param fg:
+        :param terms:
+        :param xlsx:
+        """
         self._fg = fg
         self._terms = {}
         self._xlsx = None

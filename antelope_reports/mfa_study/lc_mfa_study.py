@@ -65,6 +65,16 @@ class NestedLcaStudy(object):
                  study_container='Study Container',
                  logistics_container='Logistics Container',
                  activity_container='Activity Container'):
+        """
+
+        :param foreground: to contain the study model
+        :param models: [optional] to contain upstream models
+        :param data:
+        :param reference_flow:
+        :param study_container:
+        :param logistics_container:
+        :param activity_container:
+        """
         self._fg = foreground
         if models is None:
             models = foreground
@@ -89,6 +99,11 @@ class NestedLcaStudy(object):
         self._data = data_fg
 
     def _resolve_term(self, term):
+        """
+        Grab an entry from the foreground[s] associated with the project: first _fg, then _models, then _data if they exist
+        :param term:
+        :return:
+        """
         if hasattr(term, 'entity_type'):
             return term
         try:
@@ -426,6 +441,15 @@ class NestedLcaStudy(object):
     '''
     Model populating methods
     '''
+    def make_routes(self, routes, stage_names=None):
+        for k, v in routes.items():
+            try:
+                self.make_route(k, v, sense='Sink', stage_names=stage_names)
+            except DuplicateRoute:
+                pass
+            except EntityNotFound as e:
+                print('Route %s: entity not found %s: skipping' % (k, e.args))
+
     def install_observation_model(self, prov_frag, scope=None):
         if scope is None:
             scope = prov_frag.get('Scope')

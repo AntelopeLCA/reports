@@ -8,30 +8,39 @@ from antelope import comp_dir
 
 class StudySpec(BaseModel):
 
-    stage_names: Dict[str, str]
-    logistics_mappings: Dict[str, Tuple]
-    routes: Dict[str, Tuple]
-    study_sinks: Dict[str, Dict[str, Optional[float]]]
-    study_sources: Dict[str, Dict[str, Optional[float]]]
+    stage_names: Dict[str, str]  # target: stagename
+    logistics_mappings: Dict[str, Tuple[str, str]]  # flow: target, stagename
+    activity_mappings: Dict[Tuple[str, str], Tuple[str, str]]  # direction, flow: target, stagename
+    routes: Dict[str, Tuple]  # name: tuple-spec
+    study_sinks: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
+    study_sources: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
 
 
 class ObservedMfaStudy(DynamicUnitLcaStudy):
-    def make_activity_mappings(self):
-        raise NotImplementedError
+    def _make_study_mapping(self, container, flow, direction, target, stage=None, scenario=None):
+        if stage is None:
+            stage = container['Name']
+        f = self._resolve_term(flow)
+        try:
+            cf = next(container.children_with_flow(f, direction=direction))
+        except StopIteration:
+            cf = self.fg.new_fragment(f, direction, parent=container)
+
+        term = self._resolve_term(target)
+        cf.clear_termination(scenario=scenario)
+        cf.terminate(term, scenario=scenario, descend=False)
+        cf['StageName'] = stage
 
     def make_logistics_mappings(self, logistics_mappings):
         for k, v in logistics_mappings.items():
-            f = self._resolve_term(k)
-            try:
-                cf = next(self.logistics_container.children_with_flow(f))
-            except StopIteration:
-                cf = self.fg.new_fragment(f, 'Input', parent=self.logistics_container)
-
             t, stage = v
-            term = self._resolve_term(t)
-            cf.clear_termination()
-            cf.terminate(term, descend=False)
-            cf['StageName'] = stage
+            self._make_study_mapping(self.logistics_container, k, 'Input', t, stage=stage)
+
+    def make_activity_mappings(self, activity_mappings):
+        for k, v in activity_mappings.items():
+            d, f = k
+            t, s = v
+            self._make_study_mapping(self.activity_container, f, d, t, stage=s)
 
     def _make_study_market(self, flow_ref, sense, market_spec, stage_names=None):
         direction = comp_dir(sense)
@@ -55,7 +64,7 @@ class ObservedMfaStudy(DynamicUnitLcaStudy):
 
     def make_study(self, study_spec: StudySpec):
         self.make_routes(study_spec.routes, stage_names=study_spec.stage_names)
-        self.make_activity_mappings()  # study-specific
+        self.make_activity_mappings(study_spec.activity_mappings)
         self.make_logistics_mappings(study_spec.logistics_mappings)
         self.make_study_sources(study_spec.study_sources, stage_names=study_spec.stage_names)
         self.make_study_sinks(study_spec.study_sinks, stage_names=study_spec.stage_names)

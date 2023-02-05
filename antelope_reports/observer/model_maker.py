@@ -145,9 +145,11 @@ class ModelMaker(QuickAndEasy):
             else:
                 raise TypeError(flow_or_ref)
         else:
-            if self.fg[flow_or_ref] is None:
-                raise EntityNotFound(flow_or_ref)
             flow = self.fg[flow_or_ref]
+            if flow is None:
+                flow = self.fg.get_local(flow_or_ref)  # raises EntityNotFound eventually
+                # raise EntityNotFound(flow_or_ref)
+
             try:
                 frag = self._get_one(self.fg.fragments_with_flow(flow), strict=True, prefix=prefix)
             except EntityNotFound:
@@ -193,7 +195,7 @@ class ModelMaker(QuickAndEasy):
             flow_key = row.get('flow_name') or row.get('external_ref')
             child_flow = self.fg[flow_key] or flow_key
             if child_flow is None:
-                raise NoInformation
+                raise NoInformation  # could try get_local?
             if row.get('compartment'):
                 # context
                 rx = self.fg.get_context(row['compartment'])
@@ -339,7 +341,11 @@ class ModelMaker(QuickAndEasy):
         :param row_dict:
         :return:
         """
-        disp = self.fg['displacement']
+        # disp = self.fg['displacement']  # ugggg this should really be raising a key error
+        # if disp is None:
+        disp = self.fg.add_or_retrieve('displacement', 'Number of items', 'Displacement Rate',
+                                       comment="dimensionless value used in displacement calculation",
+                                       group="modeling")
         td = row_dict['md_flow']
         dp = row_dict['dp_flow']
         scenario = row_dict.get('scenario')
@@ -375,7 +381,7 @@ class ModelMaker(QuickAndEasy):
 
         self.fg.observe(beta, row_dict['value'], name=beta_name)
 
-        prod = self.fg[dp]
+        prod = self.fg.get_local(dp)
         try:
             output = next(beta.children_with_flow(prod))
         except StopIteration:
@@ -436,16 +442,16 @@ class ModelMaker(QuickAndEasy):
         product_refunit = row.get('refunit')
         disp_ref = row.get('dp_flow')
 
-        ext_ref = 'disposition-%s-%s' % (product_ref, disp_ref)
+        ext_ref = 'displacement-%s-%s' % (product_ref, disp_ref)
 
         mass = self.fg.get_canonical('mass')
         truck_mdl = self.fg[trans_truck]
         ocean_mdl = self.fg[trans_ocean]
 
-        td = self.fg[product_ref]
-        dp = self.fg[disp_ref]
+        td = self.fg.get_local(product_ref)
+        dp = self.fg.get_local(disp_ref)
 
-        name = 'Disposition, %s displ. %s' % (td.name, dp.name)
+        name = 'Displacement, %s displ. %s' % (td.name, dp.name)
 
         # first, construct or retrieve the reference fragment
         node = self.fg[ext_ref]

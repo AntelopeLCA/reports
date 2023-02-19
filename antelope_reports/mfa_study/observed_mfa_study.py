@@ -3,7 +3,7 @@ from .lc_mfa_study import DuplicateRoute
 from typing import Dict, Tuple, List, Optional
 from pydantic import BaseModel
 
-from antelope import comp_dir
+from antelope import comp_dir, EntityNotFound
 
 
 class StudySpec(BaseModel):

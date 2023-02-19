@@ -196,7 +196,8 @@ class NestedLcaStudy(object):
             if isinstance(parent, list) and len(parent) == 1:
                 print('found a list')
                 parent = parent[0]
-            f = self.fg.new_fragment(term.flow, term.direction, parent=parent)
+            f = self.fg.new_fragment(term.flow, term.direction, parent=parent)  # we don't *know* the child flow dirn
+            # the sign change happens at either of 2 pts: on flow matching in subfrag traversal; or at node_inbound_ev
         f.terminate(term)
         if stage_name:
             f['StageName'] = stage_name
@@ -436,6 +437,7 @@ class NestedLcaStudy(object):
                 #     c['StageName'] = 'Waste to Landfill'
 
             return parent
+        print('Not building product map for %s' % parent_or_flow)
         return False
 
     '''
@@ -446,6 +448,7 @@ class NestedLcaStudy(object):
             try:
                 self.make_route(k, v, sense='Sink', stage_names=stage_names)
             except DuplicateRoute:
+                print('Route %s exists; NOT updating' % k)
                 pass
             except EntityNotFound as e:
                 print('Route %s: entity not found %s: skipping' % (k, e.args))

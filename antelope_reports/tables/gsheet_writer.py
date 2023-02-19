@@ -81,8 +81,9 @@ class GSheetTableWriter(object):
         meta = cur_ix.col(0)
         dd = {k.value: [j.value for j in cur_ix.row(i)] for i, k in enumerate(meta) if k.value is not None}
 
-        self._gsheet.clear_region('Index', start_row=1)
-        self._gsheet.write_rectangle_by_rows('Index', (dd[k] for k in sn if k != 'Index'), start_row=1)
+        if cur_ix.nrows > 1:
+            self._gsheet.clear_region('Index', start_row=1)
+        self._gsheet.write_rectangle_by_rows('Index', (dd[k] for k in sn if k in dd and k != 'Index'), start_row=1)
 
     def __init__(self, sheet=None, active=None, index=True):
         self._index = index

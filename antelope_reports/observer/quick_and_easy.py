@@ -1,7 +1,7 @@
 from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope.exchanges_from_spreadsheet import exchanges_from_spreadsheet
-from antelope import EntityNotFound, enum, comp_dir
+from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 
 import re
 
@@ -159,7 +159,7 @@ class QuickAndEasy(object):
                     term = self._get_one(query.processes(Name='^%s$' % process_name, **kwargs), strict=strict)
                 except EntityNotFound:
                     term = self._get_one(query.processes(Name='^%s' % process_name, **kwargs), strict=strict)
-            else:
+            elif flow_name:
                 try:
                     flow = query.get(flow_name)
                 except EntityNotFound:
@@ -176,8 +176,13 @@ class QuickAndEasy(object):
                             continue
                         processes = list(filter(lambda x: bool(re.search(v, x.get(k), flags=re.I)), processes))
                     term = self._get_one(processes, strict=strict)
+            else:
+                raise ValueError('Either process_name or flow_name must be provided')
 
-        return term.reference(flow_name)
+        try:
+            return term.reference()
+        except MultipleReferences:
+            return term.reference(flow_name)
 
     def _new_reference_fragment(self, flow, direction, external_ref):
         frag = self.fg[external_ref]

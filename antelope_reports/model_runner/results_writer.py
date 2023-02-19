@@ -84,6 +84,13 @@ class ResultsWriter(object):
         return '-%s' % self.case
 
     def __init__(self, scope, output_path=None, figs_path=None, case=None):
+        """
+
+        :param scope: a string used to construct the filenames
+        :param output_path: 'output'
+        :param figs_path: 'figs'
+        :param case: [None] '-'-joined file suffix before extension
+        """
 
         self.scope = scope
         self.case = case

@@ -59,6 +59,7 @@ class ModelMaker(QuickAndEasy):
     amount_hi	-- observed exchange value for high sensitivity case (not yet implemented)
     amount_lo	-- observed exchange value for high sensitivity case (not yet implemented)
     units	-- unit of measure for amount, amount_hi, amount_lo
+    child_flow  -- optional external ref of child flow
     stage_name	-- fragment 'StageName' property
     scenario	-- support for alternative exchange value + anchor scenario specifications (not yet implemented)
     note	-- fragment 'note' property
@@ -68,17 +69,19 @@ class ModelMaker(QuickAndEasy):
     (these are used in _find_term_info(), ultimately passed to find_background_rx()
     origin	-- origin for anchor node (context or cutoff if absent)
     compartment	-- used for context flows if origin is not specified
-    flow_name	-- external ref of child flow; or passed to find_background_rx
+    term_flow	-- passed to find_background_rx as flow_name
     locale	-- used as SpatialScope argument in find_background_rx
     target_name	-- used as process_name argument in find_background_rx
     external_ref	-- passed to find_background_rx
 
     The regression is as follows:
-      if origin is specified:
+      if origin is specified: row describes an anchored flow
          origin == 'here' -> look in local foreground
          pass a dict to find_background_rx containing:
          external_ref, target_name (as process_name), flow_name, locale (as SpatialScope)
       else:
+         row describes either a cutoff or an exterior (context / environment) flow
+         flow_name is retrieved using get_local(). no other columns are used other than compartment (maybe locale)
          if compartment is specified:
             retrieve context
          else:
@@ -177,7 +180,7 @@ class ModelMaker(QuickAndEasy):
 
             d = {'external_ref': row.get('external_ref'),
                  'process_name': row.get('target_name'),
-                 'flow_name': row.get('flow_name'),
+                 'flow_name': row.get('term_flow') or row.get('child_flow'),
                  'SpatialScope': row.get('locale')}  # default to RoW
 
             try:
@@ -190,12 +193,7 @@ class ModelMaker(QuickAndEasy):
                     raise AmbiguousResult(*d.values())
             except (KeyError, EntityNotFound):
                 raise FailedTermination(*d.values())
-            child_flow = rx.flow
         else:
-            flow_key = row.get('flow_name') or row.get('external_ref')
-            child_flow = self.fg[flow_key] or flow_key
-            if child_flow is None:
-                raise NoInformation  # could try get_local?
             if row.get('compartment'):
                 # context
                 rx = self.fg.get_context(row['compartment'])
@@ -203,7 +201,7 @@ class ModelMaker(QuickAndEasy):
                 # cutoff
                 rx = None
 
-        return rx, child_flow
+        return rx
 
     def make_production_row(self, row, prefix=None):
         """
@@ -217,7 +215,16 @@ class ModelMaker(QuickAndEasy):
         """
         parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
 
-        rx, child_flow = self._find_term_info(row)
+        rx = self._find_term_info(row)
+
+        cf_ref = row.get('child_flow') or row.get('term_flow')
+        if cf_ref:
+            child_flow = self.fg.get_local(cf_ref)
+        else:
+            if hasattr(rx, 'flow'):
+                child_flow = rx.flow
+            else:
+                raise NoInformation
 
         child_direction = check_direction(row['direction'])
         if child_direction == 'balance' or row['balance_yn']:
@@ -241,8 +248,8 @@ class ModelMaker(QuickAndEasy):
                 ev = float(row['amount'])
             except (TypeError, ValueError):
                 raise BadExchangeValue(row.get('amount'))
-            self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row['scenario'])
-        c.terminate(rx, scenario=row['scenario'], descend=False)
+            self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
+        c.terminate(rx, scenario=row.get('scenario'), descend=False)
 
         if row.get('stage_name'):
             c['StageName'] = row['stage_name']
@@ -427,7 +434,7 @@ class ModelMaker(QuickAndEasy):
         cf.term.descend = False
         return cf
 
-    def make_displacement_model(self, row, trans_truck=None, trans_ocean=None):
+    def make_displacement_model(self, row, trans_truck=None, trans_ocean=None, embed_disp_prod=True):
         """
         This creates or updates a displacement model that maps a particular product flow to a particular displaced
         flow, through an alpha-beta run, with added transport.  The alpha-beta run is standard; the other parts
@@ -436,6 +443,8 @@ class ModelMaker(QuickAndEasy):
         :param row:
         :param trans_truck: external ref of truck transport process
         :param trans_ocean: external ref of ocean transport process
+        :param embed_disp_prod: [True] whether to auto-anchor the displaced product flow if a suitable production
+         activity is found.  Set to False to leave this as a cut-off flow
         :return:
         """
         product_ref = row.get('md_flow')
@@ -476,7 +485,8 @@ class ModelMaker(QuickAndEasy):
 
         disp = self.fg['prod_%s' % disp_ref]
         if disp:
-            output.terminate(disp)
+            if embed_disp_prod:
+                output.terminate(disp)
 
             if row.get('dp_truck'):
                 if truck_mdl:
@@ -496,7 +506,8 @@ class ModelMaker(QuickAndEasy):
 
     def make_displacement(self, sheetname='displacement',
                           trans_truck='prod_transport_generic',
-                          trans_ocean='prod_transport_ocean'):
+                          trans_ocean='prod_transport_ocean',
+                          embed_disp_prod=True):
         """
         Here we want to replicate what we did for CATRA, only improve it.  We have a table in the spreadsheet, and
         we want to construct a disposition model for each record that is marked "in use".  That model should:
@@ -509,10 +520,13 @@ class ModelMaker(QuickAndEasy):
         :param sheetname: default 'displacement'
         :param trans_truck: default 'prod_transport_generic'
         :param trans_ocean: default 'prod_transport_ocean'
+        :param embed_disp_prod: [True] whether to auto-anchor the displaced product flow if a suitable production
+         activity is found.  Set to False to leave this as a cut-off flow
         :return:
         """
         disp = self.xlsx[sheetname]
         for r in range(1, disp.nrows):
             row = disp.row_dict(r)
             if row.get('in_use'):
-                self.make_displacement_model(row, trans_truck=trans_truck, trans_ocean=trans_ocean)
+                self.make_displacement_model(row, trans_truck=trans_truck, trans_ocean=trans_ocean,
+                                             embed_disp_prod=embed_disp_prod)

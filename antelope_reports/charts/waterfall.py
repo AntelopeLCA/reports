@@ -137,12 +137,14 @@ class WaterfallChart(object):
                 this_style.update(self._style)
         return this_style
 
-    def _create_figure_and_axes(self, size, aspect, case_sep):
+    def _create_figure_and_axes(self, size, aspect, case_sep, n_cols):
         """
         Computes the figure size based on the content and creates the axes
         :param size: width of figure in inches
         :param aspect: ratio of bar height to axes width
         :param case_sep: vertical gap between cases in multiples of bar height
+        :param n_cols: Number of columns. if None, follow default behavior (one row, unless aspect > 3:1, in which case
+        act as though n_cols = 4)
         :return:
         """
         stage_count = sum(len(k) for k in self._stages_by_case.values())
@@ -154,9 +156,16 @@ class WaterfallChart(object):
         wid = 1 / len(self._qs)
         height = (size * wid) * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
 
-        if (size / height) > 3 and len(self._qs) > 4:
+        # a mess: re-arrange the grid if aspect is too large or if user requests it
+        if n_cols or ((size / height) > 3 and len(self._qs) > 4):
             # overrule! do a Kx4 grid of axes
-            n_cols = 4  # maybe support
+            try:
+                n_cols = int(n_cols)
+            except TypeError:
+                n_cols = 4
+
+            n_cols = min([n_cols, len(self._qs)])
+
             wid = 1 / n_cols
             n_rows = ceil(len(self._qs) / n_cols)
             row_height = (size * wid) * aspect * (stage_count + case_sep * len(self._cases) * int(len(self._cases) > 1))
@@ -203,7 +212,7 @@ class WaterfallChart(object):
                  style=None, style_dict=None,
                  include_net=True, net_name='remainder',
                  filename=None, size=6, autorange=False, font_size=None,
-                 aspect=0.1, case_sep=2.1, row_sep=None, col_sep=0.25, **kwargs):
+                 aspect=0.1, case_sep=2.1, row_sep=None, col_sep=0.25, n_cols=None, **kwargs):
         """
         Create a waterfall chart that compares the stage contributions of separate LciaResult objects.
 
@@ -220,7 +229,8 @@ class WaterfallChart(object):
 
         Each bar is drawn in the same default color, unless
         :param results: positional parameters must all be LciaResult objects having the same quantity
-        :param stages: probably best left blank
+        :param stages: an ordering of stages. use grab_stages(*results) to get a complete list, then permute it.
+        (default ordering is by score of the first quantity, decreasing)
 
         :param color:
         :param color_dict:
@@ -232,9 +242,12 @@ class WaterfallChart(object):
          and the total result. This is ignored- a discrepancy is always reported
         :param net_name: ['remainder'] what to call the net-result bar
 
+        :param n_cols: number of columns in which to arrange the plots. Defaults to one row, except if n > 4 and the
+        resulting figure has an aspect ratio of greater than 3:1, in which case uses a kx4 grid.
+
         :param filename: default 'waterfall_%.3s.eps' % uuid.  Enter 'none' to return (and not save) the chart
         :param size: axes size in inches (default 6") (width for horiz bars; height for vert bars)
-        :param autorange: [False] whether to auto-range the results
+        :param autorange: [False] whether to auto-range the results (no longer supported)
         :param font_size: [None] set text [numbers smaller]
         :param kwargs: aspect: bar height per fig width [0.1]
         case_sep [2.1 bar widths], col_sep=0.25in, num_format [%3.2g], bar_width [0.85] font_size [None] row_sep [None]
@@ -265,6 +278,9 @@ class WaterfallChart(object):
         # group stages by case
         if stages is None:
             stages = {case: grab_stages(*ress) for case, ress in self._res_by_case.items()}
+        else:
+            stages = {case: list(filter(lambda x: x in grab_stages(*ress), stages))
+                      for case, ress in self._res_by_case.items()}
 
         self._stages_by_case = stages
 
@@ -293,7 +309,7 @@ class WaterfallChart(object):
         self._fig = None
         self._span = (0, 0)  # for current axes only
 
-        self._create_figure_and_axes(size, aspect, case_sep)
+        self._create_figure_and_axes(size, aspect, case_sep, n_cols)
 
         for i, q in enumerate(self._qs):
             self._q = q
@@ -388,6 +404,7 @@ class WaterfallChart(object):
             # ax.set_xticklabels(xticklabels)
             '''
             ax.set_xlabel(self._q.unit)
+            ax.ticklabel_format(axis='x', scilimits=(-3, 3))
 
             # font size
             if self._font_size:

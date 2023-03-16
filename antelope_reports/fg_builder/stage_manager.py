@@ -1,4 +1,4 @@
-from synonym_dict import SynonymDict
+from synonym_dict import SynonymDict, TermExists
 
 
 class StageManager(object):
@@ -18,18 +18,19 @@ class StageManager(object):
     _maps = None
     skip_values = {None, 0, 'NA'}
 
-    def __init__(self, xlsx, sheetname='stage_names', write=True, stage_name='StageName', ignore_case=True):
+    def __init__(self, xlsx, sheetname='stage_names', write=True, default_name='StageName', ignore_case=True):
         self._xlsx = xlsx
         self._sheetname = sheetname
         self._w = bool(write)
         if sheetname not in xlsx.sheet_names():
             if self._w:
                 self._xlsx.create_sheet(sheetname)
-                self._xlsx.write_row(sheetname, 0, (stage_name,))
+                self._xlsx.write_row(sheetname, 0, (default_name,))
             else:
                 raise KeyError('Sheet %s is missing and write is disabled' % sheetname)
 
         self._maps = []
+        self._default = default_name
         self._mappings = dict()
         self._sd = SynonymDict(ignore_case=ignore_case)
         self._sd._ignore_case = ignore_case
@@ -38,10 +39,6 @@ class StageManager(object):
 
     def _values(self, _adict):
         return filter(lambda x: x not in self.skip_values, _adict.values())
-
-    @property
-    def _default(self):
-        return self._maps[0]
 
     @property
     def keys(self):
@@ -62,12 +59,26 @@ class StageManager(object):
     def _create_or_update_entry(self, row, default=None):
         if default is None:
             default = row[self._default]
-        ent = self._sd.new_entry(default, *self._values(row), prune=True)
-        return ent.object
+        try:
+            # update
+            key = self._sd[default]
+            for v in self._values(row):
+                try:
+                    self._sd.add_synonym(key, v)
+                except TermExists:
+                    print('%s: Skipping existing term "%s")' % (default, v))
+            return key
+        except KeyError:
+            # create-- prune = True because
+            ent = self._sd.new_entry(default, *self._values(row), prune=True)
+            return ent.object
 
     def read_mappings(self):
         self._sheet = self._xlsx.sheet_by_name(self._sheetname)
         self._maps = [k.value for k in self._sheet.row(0)]
+        if self._default not in self._maps:
+            print('warning: default name %s not present in mappings; using %s' % (self._default, self._maps[0]))
+            self._default = self._maps[0]
         for i in range(1, self._sheet.nrows):
             row = self._sheet.row_dict(i)
             key = self._create_or_update_entry(row)
@@ -111,12 +122,23 @@ class StageManager(object):
             key = self._sd[term]
             d = self._mappings[key]
             d.update(kwargs)
+            self._create_or_update_entry(d, default=key)
         except KeyError:
+            d = {self._default: term}
             key = self._create_or_update_entry(kwargs, default=term)
-            d = kwargs
+            d.update(kwargs)
         for col, val in kwargs.items():
             self.add_map_column(col)
         self._mappings[key] = d
+
+    def add_synonym(self, term, synonym):
+        """
+
+        :param term: existing term
+        :param synonym: new synonym
+        :return:
+        """
+        self._sd.add_synonym(term, synonym)
 
     def prune_keys(self, keys):
         s = set(keys)
@@ -150,3 +172,6 @@ class StageManager(object):
                 yield _row_gen(_k)
 
         self._xlsx.write_rectangle_by_rows(self._sheetname, _table_gen(), start_row=1)
+
+    def __getitem__(self, item):
+        return self.retrieve(item)

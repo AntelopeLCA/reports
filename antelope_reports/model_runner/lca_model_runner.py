@@ -59,7 +59,7 @@ class LcaModelRunner(object):
     _seen_stages = None
     _fmt = '%.10e'
 
-    def __init__(self, agg_key=None):
+    def __init__(self, agg_key=None, autorange=False):
         """
 
         :param agg_key: default is StageName
@@ -72,12 +72,27 @@ class LcaModelRunner(object):
         self._publish = None
 
         self._results = dict()
+        self._ar = autorange
         self.set_agg_key(agg_key)
+
+    def set_autorange(self):
+        for lm in self._lcia_methods:
+            res = [self._results[c, lm] for c in self.scenarios]
+            span = max(abs(r.span) for r in res)
+            for r in res:
+                r.set_autorange(span)
+        self._ar = True
+
+    def unset_autorange(self):
+        for lm in self._lcia_methods:
+            for c in self.scenarios:
+                self._results[c, lm].unset_autorange()
+        self._ar = False
 
     def recalculate(self):
         self._results = dict()
-        for l in self.lcia_methods:
-            self.run_lcia(l)
+        for lm in self.lcia_methods:
+            self.run_lcia(lm)
         for w in self.weightings:
             self._run_weighting(w)
 
@@ -179,7 +194,9 @@ class LcaModelRunner(object):
         ws = self._weightings[quantity]
         res = [self.result(scen, q) for q in ws.keys()]
         wgt = weigh_lcia_results(quantity, *res, weight=ws)
-        self._results[scen, quantity] = wgt
+        if self._ar:
+            wgt.set_autorange()
+        self._results[scen, quantity] = wgt    #!!!@
 
     def _run_weighting(self, quantity):
         ws = self._weightings[quantity]
@@ -201,9 +218,11 @@ class LcaModelRunner(object):
     def run_lcia_case_method(self, scen, lcia, **kwargs):
         res = self._run_scenario_lcia(scen, lcia, **kwargs)
         res.scenario = scen
+        if self._ar:
+            res.set_autorange()
         for stg in list(res.aggregate(key=self._agg).keys()):
             self._seen_stages[stg].add(scen)
-        self._results[scen, lcia] = res
+        self._results[scen, lcia] = res    #!!@
 
     def run_lcia(self, lcia, **kwargs):
         if lcia not in self._lcia_methods:
@@ -306,12 +325,12 @@ class LcaModelRunner(object):
             dto = dto.set_index(self._scenario_index(k) for k in ord_columns)
 
         if norm:
-            dn = DataFrame({'Normalization': [l.norm() for l in self.quantities]},
+            dn = DataFrame({'Normalization': [lm.norm() for lm in self.quantities]},
                            index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
             dto = dn.append(dto)
 
         if _total:
-            dt = DataFrame({'Total': [self._format(self.result(_total, l).total()) for l in self.quantities]},
+            dt = DataFrame({'Total': [self._format(self.result(_total, lm).total()) for lm in self.quantities]},
                            index=MultiIndex.from_tuples(self._qty_tuples)).transpose()
             dto = dto.append(dt)
 
@@ -337,8 +356,8 @@ class LcaModelRunner(object):
 
     def scenario_detail_tbl(self, scenario, filename=None, column_order=None, norm=False, total=False):
         dt = DataFrame(({k.entity: self._format(k.cumulative_result)
-                         for k in self.result(scenario, l).aggregate(key=self._agg).components()}
-                        for l in self.quantities), index=MultiIndex.from_tuples(self._qty_tuples))
+                         for k in self.result(scenario, lm).aggregate(key=self._agg).components()}
+                        for lm in self.quantities), index=MultiIndex.from_tuples(self._qty_tuples))
         if total:
             _total = scenario
         else:
@@ -348,8 +367,8 @@ class LcaModelRunner(object):
     def scenario_summary_tbl(self, filename=None, column_order=None, norm=False, add_row_index=False):
         if column_order is None:
             column_order = list(self.scenarios)
-        dt = DataFrame(({k: self._format(self.result(k, l).total()) for k in column_order}
-                        for l in self.quantities),
+        dt = DataFrame(({k: self._format(self.result(k, lm).total()) for k in column_order}
+                        for lm in self.quantities),
                        index=MultiIndex.from_tuples(self._qty_tuples))
         return self._finish_dt_output(dt, column_order, filename, norm=norm, add_row_index=add_row_index)
     

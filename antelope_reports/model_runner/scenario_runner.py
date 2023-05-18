@@ -23,12 +23,12 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
                 return arg,
         return ()
 
-    def __init__(self, model, *common_scenarios, agg_key=None):
+    def __init__(self, model, *common_scenarios, **kwargs):
         """
 
-        :param agg_key: default is StageName
+        :param kwargs: agg_key, default is lambda x: x['StageName']; autorange [False]
         """
-        super(ScenarioRunner, self).__init__(agg_key=agg_key)
+        super(ScenarioRunner, self).__init__(**kwargs)
 
         self._common_scenarios = set()
 

@@ -59,7 +59,7 @@ class LcaModelRunner(object):
     _seen_stages = None
     _fmt = '%.10e'
 
-    def __init__(self, agg_key=None, autorange=False):
+    def __init__(self, agg_key=None):
         """
 
         :param agg_key: default is StageName
@@ -72,22 +72,7 @@ class LcaModelRunner(object):
         self._publish = None
 
         self._results = dict()
-        self._ar = autorange
         self.set_agg_key(agg_key)
-
-    def set_autorange(self):
-        for lm in self._lcia_methods:
-            res = [self._results[c, lm] for c in self.scenarios]
-            span = max(abs(r.span) for r in res)
-            for r in res:
-                r.set_autorange(span)
-        self._ar = True
-
-    def unset_autorange(self):
-        for lm in self._lcia_methods:
-            for c in self.scenarios:
-                self._results[c, lm].unset_autorange()
-        self._ar = False
 
     def recalculate(self):
         self._results = dict()
@@ -194,9 +179,7 @@ class LcaModelRunner(object):
         ws = self._weightings[quantity]
         res = [self.result(scen, q) for q in ws.keys()]
         wgt = weigh_lcia_results(quantity, *res, weight=ws)
-        if self._ar:
-            wgt.set_autorange()
-        self._results[scen, quantity] = wgt    #!!!@
+        self._results[scen, quantity] = wgt
 
     def _run_weighting(self, quantity):
         ws = self._weightings[quantity]
@@ -218,11 +201,9 @@ class LcaModelRunner(object):
     def run_lcia_case_method(self, scen, lcia, **kwargs):
         res = self._run_scenario_lcia(scen, lcia, **kwargs)
         res.scenario = scen
-        if self._ar:
-            res.set_autorange()
         for stg in list(res.aggregate(key=self._agg).keys()):
             self._seen_stages[stg].add(scen)
-        self._results[scen, lcia] = res    #!!@
+        self._results[scen, lcia] = res
 
     def run_lcia(self, lcia, **kwargs):
         if lcia not in self._lcia_methods:

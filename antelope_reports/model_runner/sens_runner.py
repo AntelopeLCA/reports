@@ -85,23 +85,6 @@ class SensitivityRunner(ScenarioRunner):
         if self._sens_lo:
             self._traverse_lo(case)
 
-    def set_autorange(self):
-        for lm in self._lcia_methods:
-            res = [self._results[c, lm] for c in self.scenarios]
-            span = max(abs(r.span) for r in res)
-            for r in res:
-                r.set_autorange(span)
-            for c in self.scenarios:
-                self._results_hi[c, lm].set_autorange(span)
-                self._results_lo[c, lm].set_autorange(span)
-
-    def unset_autorange(self):
-        for lm in self._lcia_methods:
-            for c in self.scenarios:
-                self._results[c, lm].unset_autorange()
-                self._results_hi[c, lm].unset_autorange()
-                self._results_lo[c, lm].unset_autorange()
-
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]
         sc_apply = sc + tuple(self.common_scenarios)

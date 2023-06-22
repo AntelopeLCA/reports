@@ -362,6 +362,7 @@ class PosNegCompareError(object):
         _overdraw = []
 
         def _get_pos_neg(_arg):
+            """returns the total scores of positive and negative components from the LciaResult """
             _pos_ = 0.0
             _neg_ = 0.0
             for comp in _arg.keys():
@@ -374,18 +375,18 @@ class PosNegCompareError(object):
 
         for i, arg in enumerate(args):
             if isinstance(arg, tuple):
-                _pos, _neg = _get_pos_neg(arg[0])
-                _pos1, _neg1 = _get_pos_neg(arg[1])
-                _pos2, _neg2 = _get_pos_neg(arg[2])
+                _pos, _neg = _get_pos_neg(arg[0])  # pos and neg for base result
+                _pos1, _neg1 = _get_pos_neg(arg[1])  # pos and neg for first sensitivity
+                _pos2, _neg2 = _get_pos_neg(arg[2])  # pos and neg for second sensitivity
 
-                _pos_err_min = max([_pos - _pos1, _pos - _pos2])
-                _pos_err_max = max([_pos1 - _pos, _pos2 - _pos])
+                _pos_err_min = max([_pos - _pos1, _pos - _pos2, 0.0])  # size of negative anomaly on positive bar
+                _pos_err_max = max([_pos1 - _pos, _pos2 - _pos, 0.0])  # size of the positive anomaly on positive bar
 
-                _neg_err_min = max([_neg - _neg1, _neg - _neg2])
-                _neg_err_max = max([_neg1 - _neg, _neg2 - _neg])
+                _neg_err_min = max([_neg - _neg1, _neg - _neg2, 0.0])  # size of negative anomaly on negative bar
+                _neg_err_max = max([_neg1 - _neg, _neg2 - _neg, 0.0])  # size of the positive anomaly on negative bar
 
-                _neg_est = min([_neg, _neg1, _neg2])
-                _pos_est = max([_pos, _pos1, _pos2])
+                _neg_est = min([_neg, _neg1, _neg2])  # lowest negative extent
+                _pos_est = max([_pos, _pos1, _pos2])  # greatest positive extent
 
                 self._pos_err.append((_pos_err_min, _pos_err_max))
                 self._neg_err.append((_neg_err_min, _neg_err_max))
@@ -450,7 +451,6 @@ class PosNegCompareError(object):
 
             ax = fig.add_axes([i/n, 0, 0.8/n, 1.0])
 
-
             span = (-1 * max_ratio * self._pos[i], max_over * self._pos[i])
             print(span)
 
@@ -458,7 +458,11 @@ class PosNegCompareError(object):
             self._pna[i].draw_pos_neg(1, self._pos[i], self._neg[i], num_format=num_format, pos_err=self._pos_err[i][1])
 
             if any(self._pos_err[i] + self._neg_err[i]):
-                self._pna[i].draw_error_bars(1, self._pos[i], self._pos_err[i], self._neg[i], self._neg_err[i])
+                try:
+                    self._pna[i].draw_error_bars(1, self._pos[i], self._pos_err[i], self._neg[i], self._neg_err[i])
+                except ValueError:
+                    print('Value error on %d:\n %g\n %g\n %g\n %g' % (i, self._pos_err[i][0], self._pos_err[i][1],
+                                                                      self._neg_err[i][0], self._neg_err[i][1]))
 
             self._pna[i].finish(legend=legend)
             ax.set_xticks([])

@@ -6,17 +6,19 @@ from pandas import DataFrame, MultiIndex
 from antelope_core.lcia_results import LciaResult
 
 
-def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', **kwargs):
+def tabularx_ify(df, filename, width='\\textwidth', column_format='\\tabspec', hrules=True, **kwargs):
     """
     Need to figure out how to bring \tabspec in-- (answer: jinja?)
     :param df:
     :param filename:
     :param width:
     :param column_format: column format specification
-    :param sort_column: optional integer column number by which to sort (most positive to most negative)
+    :param hrules: True
+    #:param sort_column: optional integer column number by which to sort (most positive to most negative)
+    # did this get dropped or what
     :return:
     """
-    longstr = df.style.to_latex(column_format=column_format, **kwargs)  # df.style.to_latex recommended but has dependencies
+    longstr = df.style.to_latex(column_format=column_format, hrules=hrules, **kwargs)  # df.style.to_latex recommended but has dependencies
     tabularx = longstr.replace(
         '{tabular}', '{tabularx}').replace(
         'begin{tabularx}', 'begin{tabularx}{%s}' % width)

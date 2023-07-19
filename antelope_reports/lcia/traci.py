@@ -41,3 +41,33 @@ def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication'):
                 new_eut.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
                                      value=cf[loc], location=loc, origin=cf.origin)
     return new_eut
+
+
+def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2'):
+    """
+    Duplicate the GWP method, but force the duplicate to compute biogenic CO2: see antelope.flows.flow.Flow.lookup_cf()
+    :param traci:
+    :param fg:
+    :param external_ref:
+    :return:
+    """
+    try:
+        return fg.get(external_ref)
+    except EntityNotFound:
+        pass
+
+    old_gwp = traci.get('Global Warming Air')
+    new_gwp = fg.new_quantity('Global Warming Air - with biogenic CO2', ref_unit=old_gwp.unit,
+                              external_ref=external_ref,
+                              Method=old_gwp['Method'], Category='Global Warming Air - with biogenic CO2',
+                              Indicator=old_gwp.unit,
+                              uuid='64583b7d-bdd0-4d44-ae53-494d5b192606',
+                              Comment='TRACI GWP method with biogenic CO2 enforced',
+                              quell_biogenic_co2=False)
+    old_gwp['quell_biogenic_co2'] = True
+
+    for cf in old_gwp.factors():
+        for loc in cf.locations:
+            new_gwp.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
+                                 value=cf[loc], location=loc, origin=cf.origin)
+    return new_gwp

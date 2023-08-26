@@ -209,7 +209,7 @@ class XlsxForegroundUpdater(XlsxUpdater):
                 parent = None
             else:
                 parent = self.ar[frag['parent']]
-                parent.to_foreground()
+                # parent.to_foreground()  # this is now accomplished in fragment constructor via set_parent()
             f = self._find_frag(frag)
             if f is None:
                 f = self.ar.new_fragment(frag[self.flow_key], frag['direction'], parent=parent,

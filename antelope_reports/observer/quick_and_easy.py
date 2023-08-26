@@ -1,5 +1,6 @@
 from antelope_foreground.foreground_catalog import NoSuchForeground
 
+from antelope_core.contexts import NullContext
 from antelope.exchanges_from_spreadsheet import exchanges_from_spreadsheet
 from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 
@@ -284,7 +285,7 @@ class QuickAndEasy(object):
                 z = self.fg.new_fragment(bg.flow, comp_dir(bg.direction), parent=bg)
             ev = bg.exchange_value(scenario, observed=True) * scaleup_adj
             self.fg.observe(z, exchange_value=ev, scenario=scenario)
-            z.to_foreground()  # truncates
+            z.terminate(NullContext)  # truncates
 
     def add_tap(self, parent, child_flow, direction='Input', scenario=None, term=None, term_flow=None,
                 include_zero=False, **kwargs):
@@ -320,7 +321,7 @@ class QuickAndEasy(object):
         self.fg.observe(c, exchange_value=ev, scenario=scenario)
         if term is not None:
             if term is True:
-                c.to_foreground()
+                c.terminate(NullContext)
             else:
                 c.terminate(term, term_flow=term_flow, scenario=scenario)
 

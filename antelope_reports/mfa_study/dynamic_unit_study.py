@@ -1,4 +1,5 @@
 from antelope import EntityNotFound
+from antelope_core.contexts import NullContext
 
 from .lc_mfa_study import NestedLcaStudy
 
@@ -77,9 +78,9 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
             self._fg.new_fragment(self.unit_balance_flow, 'Output', parent=c, balance=True)
             d = self._fg.new_fragment(unit_ref, 'Output', parent=b, exchange_value=1.0, external_ref='Unit - Dynamic Supplies')
             self._fg.observe(d)  # lock in the 1.0 exchange value
-            d.to_foreground()
+            # d.to_foreground()  # this is now accomplished in new fragment constructor via set_parent()
             rl = self._fg.new_fragment(self.reference_material, 'Output', parent=d, exchange_value=1.0, external_ref='Unit Logistics')
-            rl.to_foreground()
+            rl.terminate(NullContext)  # replaces to_foreground()
             self._fg.observe(rl)  # lock in the 1.0 exchange value
 
             self._fg.observe(self.activity_container, termination=unit, scenario='Unit')

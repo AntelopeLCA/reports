@@ -1,4 +1,6 @@
-from .scenario_runner import ScenarioRunner, frag_flow_lcia
+from .scenario_runner import ScenarioRunner
+from antelope_foreground.fragment_flows import group_ios, ios_exchanges, frag_flow_lcia
+
 from collections import defaultdict
 
 
@@ -84,6 +86,14 @@ class SensitivityRunner(ScenarioRunner):
 
         if self._sens_lo:
             self._traverse_lo(case)
+
+    def inventory_hi(self, scenario, **kwargs):
+        ios, _ = group_ios(self._model, self._traversals_hi[scenario], **kwargs)
+        return ios_exchanges(ios, ref=self._model)
+
+    def inventory_lo(self, scenario, **kwargs):
+        ios, _ = group_ios(self._model, self._traversals_lo[scenario], **kwargs)
+        return ios_exchanges(ios, ref=self._model)
 
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]

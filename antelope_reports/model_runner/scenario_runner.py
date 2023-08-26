@@ -1,7 +1,7 @@
 from .components_mixin import ComponentsMixin
 from .lca_model_runner import LcaModelRunner
 
-from antelope_foreground.fragment_flows import frag_flow_lcia
+from antelope_foreground.fragment_flows import group_ios, ios_exchanges, frag_flow_lcia
 
 
 class ScenarioRunner(ComponentsMixin, LcaModelRunner):
@@ -98,6 +98,10 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self.add_scenario(case)  # raises KeyError
         self._params[case] = self._scenario_tuple(params)
         self._recalculate_case(case)
+
+    def inventory(self, scenario, **kwargs):
+        ios, _ = group_ios(self._model, self._traversals[scenario], **kwargs)
+        return ios_exchanges(ios, ref=self._model)
 
     def _run_scenario_lcia(self, scenario, lcia, **kwargs):
         sc = self._params[scenario]

@@ -43,12 +43,13 @@ def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication'):
     return new_eut
 
 
-def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2'):
+def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2', indicator='kg CO2eq incl bio'):
     """
     Duplicate the GWP method, but force the duplicate to compute biogenic CO2: see antelope.flows.flow.Flow.lookup_cf()
     :param traci:
     :param fg:
     :param external_ref:
+    :param indicator:
     :return:
     """
     try:
@@ -57,10 +58,10 @@ def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2'):
         pass
 
     old_gwp = traci.get('Global Warming Air')
-    new_gwp = fg.new_quantity('Global Warming Air - with biogenic CO2', ref_unit=old_gwp.unit,
+    new_gwp = fg.new_quantity('Global Warming Air - with biogenic CO2', ref_unit=indicator,
                               external_ref=external_ref,
-                              Method=old_gwp['Method'], Category='Global Warming Air - with biogenic CO2',
-                              Indicator=old_gwp.unit,
+                              Method=old_gwp['Method'], Category='Global Warming Air - including biogenic CO2',
+                              Indicator=indicator,
                               uuid='64583b7d-bdd0-4d44-ae53-494d5b192606',
                               Comment='TRACI GWP method with biogenic CO2 enforced',
                               quell_biogenic_co2=False)
@@ -71,3 +72,36 @@ def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2'):
             new_gwp.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
                                  value=cf[loc], location=loc, origin=cf.origin)
     return new_gwp
+
+
+def traci_2_biogenic_co2_only(traci, fg, external_ref='gwp_bio_co2_only', indicator='kg CO2-bio'):
+    """
+    Create a new method that *only* includes biogenic CO2 flows
+    :param traci:
+    :param fg:
+    :param external_ref:
+    :param indicator:
+    :return:
+    """
+    try:
+        return fg.get(external_ref)
+    except EntityNotFound:
+        pass
+
+    old_gwp = traci.get('Global Warming Air')
+    bio_c_only = fg.new_quantity('Global Warming Air - biogenic CO2 Only', ref_unit=indicator,
+                                 external_ref=external_ref,
+                                 Method=old_gwp['Method'], Category='Global Warming Air - only biogenic CO2',
+                                 Indicator=indicator,
+                                 uuid='2271523e-108f-4216-a65e-dac18ce3e83f',
+                                 Comment='GWP from biogenic CO2 only (no other emissions included)',
+                                 quell_biogenic_co2='only')
+    old_gwp['quell_biogenic_co2'] = True
+
+    co2 = fg.flowable('124-38-9')
+    for cf in old_gwp.factors():
+        if fg.flowable(cf.flowable) is co2:
+            for loc in cf.locations:
+                bio_c_only.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
+                                        value=cf[loc], location=loc, origin=cf.origin)
+    return bio_c_only

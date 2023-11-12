@@ -390,6 +390,7 @@ class NestedLcaStudy(object):
         if self._check_p_map(p_map):
             if parent_or_flow.entity_type == 'flow':
                 market_ref = 'mix-%s-%s' % (sense, parent_or_flow.external_ref)
+                market_ref = market_ref.replace('/', '_')
                 parent = self.fg[market_ref]
                 if parent is not None:
                     return parent  # don't support dynamic modification of markets
@@ -420,6 +421,7 @@ class NestedLcaStudy(object):
                         mix_name = 'mix-%s-%s-%s' % (sense, parent.flow.external_ref, k)
                     else:
                         mix_name = '%s-%s' % (parent.external_ref, k)
+                    mix_name = mix_name.replace('/', '_')
                     self.fg.observe(c, name=mix_name, exchange_value=v, auto=True)
 
                 if term.entity_type == 'fragment':

@@ -3,7 +3,9 @@ def transport_model(modeled_flow):
 
 
 def activity_model_ref(modeled_fragment):
-    return 'Activity model - %s' % modeled_fragment['Name']
+    n = 'Activity model - %s (%s)' % (modeled_fragment['Name'], modeled_fragment.get('scope'))
+    n = n.replace('/', '_')
+    return n
 
 
 def logistics_summary_ref(sc_frag):

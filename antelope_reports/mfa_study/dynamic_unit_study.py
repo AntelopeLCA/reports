@@ -1,5 +1,4 @@
 from antelope import EntityNotFound
-from antelope_core.contexts import NullContext
 
 from .lc_mfa_study import NestedLcaStudy
 
@@ -80,7 +79,7 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
             self._fg.observe(d)  # lock in the 1.0 exchange value
             # d.to_foreground()  # this is now accomplished in new fragment constructor via set_parent()
             rl = self._fg.new_fragment(self.reference_material, 'Output', parent=d, exchange_value=1.0, external_ref='Unit Logistics')
-            rl.terminate(NullContext)  # replaces to_foreground()
+            # rl.terminate(NullContext)  # replaces to_foreground() we do not want this going to context!
             self._fg.observe(rl)  # lock in the 1.0 exchange value
 
             self._fg.observe(self.activity_container, termination=unit, scenario='Unit')
@@ -132,7 +131,9 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
 
     def add_logistics_route(self, flow, provider, descend=False, term_map=None, **kwargs):
         c = super(DynamicUnitLcaStudy, self).add_logistics_route(flow, provider, descend=descend, **kwargs)
-        return self._add_unit_knob(c.flow.name, c.flow, 'Input', self.unit_logistics, descend, term_map=term_map)
+        knob = c.flow.name
+        knob = knob.replace('/', '_')
+        return self._add_unit_knob(knob, c.flow, 'Input', self.unit_logistics, descend, term_map=term_map)
 
     def _add_unit_knob(self, knob, entry, direction, parent, descend=None, term_map=None):
         """

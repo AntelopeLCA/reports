@@ -16,15 +16,15 @@ class FlowComparator(object):
 
     """
 
-    def __init__(self, cat):
-        self._cat = cat
+    def __init__(self, tm):
+        self._tm = tm
         self._unknown_flows = dict()
 
     def _lcia_get_flowable(self, _flowable, _origin):
         if _origin not in self._unknown_flows:
             self._unknown_flows[_origin] = set()
         try:
-            return self._cat.lcia_engine.get_flowable(_flowable)
+            return self._tm.get_flowable(_flowable)
         except KeyError:
             self._unknown_flows[_origin].add(_flowable)
             return _flowable
@@ -93,7 +93,7 @@ class FlowComparator(object):
         _u = _s1.intersection(_s2)
         _d1 = _s1.difference(_u)
         _d2 = _s2.difference(_u)
-        print('%d , %d , %d' % (len(_d1), len(_u), len(_d2)))
+        print('only a: %d ,common: %d , only b: %d' % (len(_d1), len(_u), len(_d2)))
         return _d1, _u, _d2
 
     @property

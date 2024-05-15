@@ -1,12 +1,18 @@
 """
 LcaModel class-- specifies what makes up the core model
+I don't think this is used anywhere
 """
 
-from antelope import EntityNotFound, EntitySpec, q_node_activity
+from antelope import EntityNotFound, q_node_activity
 from .conventions import logistics_summary_ref, transport_model
 
 from .interface import LcaModelInterface
 from .markets import build_market_mix
+
+from collections import namedtuple
+
+
+EntitySpec = namedtuple('EntitySpec', ('link', 'ref', 'name', 'group'))
 
 
 class LcaModel(LcaModelInterface):
@@ -122,11 +128,11 @@ class LcaModel(LcaModelInterface):
         log_ref = logistics_summary_ref(sc_frag)
 
         if self._fg[log_ref] is None:
-            net_inflow = sum(k.value for k in sc_frag.inventory() if k.direction == 'Input' and k.unit == 'kg')
+            net_inflow = sum(k.value for k in sc_frag.cutoffs() if k.direction == 'Input' and k.unit == 'kg')
 
             f = self._fg.new_fragment(self.reference_flow, 'Input', value=net_inflow)
             self._fg.new_fragment(self.reference_flow, 'Output', balance=True, parent=f)
-            for k in sc_frag.inventory():
+            for k in sc_frag.cutoffs():
                 if k.direction == 'Input' and k.unit == 't*km':
                     t = self._fg.new_fragment(k.flow, k.direction, value=k.value, parent=f)
                     self._fg.observe(t)

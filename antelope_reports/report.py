@@ -97,7 +97,7 @@ def fragment_fu(frag, scenario=None):
 
 
 def fragment_inventory(fragment, scenario=None):
-    exchs = [x for x in fragment.inventory(scenario=scenario, observed=True)]
+    exchs = [x for x in fragment.cutoffs(scenario=scenario, observed=True)]
     inventory = ''
     if len(exchs) > 0:
         inventory += '\n{\\small\n\\begin{tabular}{rccl}\n'

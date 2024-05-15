@@ -168,7 +168,7 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
         return k
 
     def _add_child_flows(self, frag, term, dynamic_outputs):
-        for k in term.inventory():
+        for k in term.cutoffs():
             if not k.is_reference:
                 if k.flow.external_ref in dynamic_outputs:
                     v = self._resolve_term(dynamic_outputs[k.flow.external_ref])

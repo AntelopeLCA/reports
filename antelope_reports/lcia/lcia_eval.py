@@ -107,7 +107,7 @@ class LciaEval(object):
         for rx_or_p in rx_or_processes:
             if rx_or_p.entity_type == 'fragment':
                 process = rx_or_p
-                ios, internal = process.unit_inventory()
+                ios, internal = process.unit_flows()
                 io = ios[0]
                 rx = ExchangeRef(process, io.fragment.flow, io.fragment.direction, value=io.magnitude, is_reference=True)
                 lci = [ExchangeRef(process, k.fragment.flow, k.fragment.direction, value=k.magnitude,

@@ -1,6 +1,7 @@
 from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope_core.contexts import NullContext
+from antelope import ConversionError
 from antelope.exchanges_from_spreadsheet import exchanges_from_spreadsheet
 from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 
@@ -95,6 +96,19 @@ class QuickAndEasy(object):
             for k, v in terms.items():
                 self._terms[k] = self.fg.catalog_ref(*v)
 
+    def _populate_unit_map(self):
+        for q_can in ('mass', 'volume', 'net calorific value', 'number of items'):
+            q = self.fg.get_canonical(q_can)
+            for u in q['unitconversion'].keys():
+                self._unit_map[u] = q.external_ref
+        kwh = self.fg.get_canonical('kWh')
+        for u in ('kWh', 'MWh', 'GWh'):
+            try:
+                kwh.convert(u)
+                self._unit_map[u] = kwh.external_ref
+            except ConversionError:
+                pass
+
     def __init__(self, fg, terms=None, xlsx=None):
         """
         A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
@@ -107,6 +121,9 @@ class QuickAndEasy(object):
         self._terms = {}
         self._xlsx = None
         self.set_terms(terms)
+        self._unit_map = dict()
+        self._populate_unit_map()
+
         if xlsx:
             self.xlsx = xlsx
 
@@ -122,7 +139,10 @@ class QuickAndEasy(object):
         :return:
         """
         if xlsx:
-            self.fg.apply_xlsx(xlsx)
+            try:
+                self.fg.apply_xlsx(xlsx)
+            except AttributeError:
+                next(self.fg._iface('foreground')).apply_xlsx(xlsx)
             self._xlsx = xlsx
 
     @property
@@ -152,9 +172,9 @@ class QuickAndEasy(object):
         :return: 
         """
         if external_ref:
-            term = self.fg.catalog_ref(origin, external_ref)
+            term = self.fg.cascade(origin).get(external_ref)
         else:
-            query = self.fg.catalog_query(origin)
+            query = self.fg.cascade(origin)
             if process_name:
                 try:
                     term = self._get_one(query.processes(Name='^%s$' % process_name, **kwargs), strict=strict)
@@ -178,7 +198,7 @@ class QuickAndEasy(object):
                         processes = list(filter(lambda x: bool(re.search(v, x.get(k), flags=re.I)), processes))
                     term = self._get_one(processes, strict=strict)
             else:
-                raise ValueError('Either process_name or flow_name must be provided')
+                raise AmbiguousResult('Either process_name or flow_name must be provided')
 
         try:
             return term.reference()

@@ -1,6 +1,7 @@
-from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, check_direction
+from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, check_direction, ConversionError
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
+import logging
 
 
 class ConsistencyError(Exception):
@@ -113,6 +114,104 @@ class ModelMaker(QuickAndEasy):
     dp_ocean	-- ocean transport for massive dp flows, using truck transport target specified by trans_ocean
 
     """
+    def autodetect_flows(self, sheetname, external_ref=None, ref_quantity=None, ref_unit=None, name=None,
+                         context=None, entity_uuid=None, **kwargs):
+        """
+        Load the designated sheet. iterate through rows, using the arguments as column mappings.
+
+        :param sheetname: name of the source sheet
+        :param external_ref:
+        :param ref_quantity:
+        :param ref_unit:
+        :param name:
+        :param context:
+        :param entity_uuid:
+        :param kwargs:
+        :return:
+        """
+        sheet = self.xlsx[sheetname]
+
+        if external_ref is None:
+            external_ref = 'external_ref'
+        if ref_quantity is None:
+            if ref_unit is None:
+                ref_quantity = 'referenceQuantity'
+            else:
+                pass  # use ref_unit
+        if name is None:
+            name = 'name'
+
+        # all others are optional
+        if context:
+            kwargs['context'] = context
+        if entity_uuid:
+            kwargs['entity_uuid'] = entity_uuid
+
+        count = 0
+        new = set()
+
+        for r in range(1, sheet.nrows):
+            ssr = r + 1
+            row = sheet.row_dict(r)
+            ext_ref = row.get(external_ref)
+            the_name = row.get(name, ext_ref)
+            if ext_ref is None:
+                continue
+            if ref_quantity is None:
+                ref_q = self._unit_map.get(row.get(ref_unit), 'Items')
+            else:
+                ref_q = row.get(ref_quantity)
+            count += 1
+
+            args = {k: row.get(v) for k, v in kwargs.items() if v is not None and row.get(v) is not None}
+            if self.fg[ext_ref] is None:
+                new.add(ext_ref)
+            self.fg.add_or_retrieve(ext_ref, ref_q, the_name, **args)
+
+        print('Reviewed %d flows (%d new added)' % (count, len(new)))
+
+    def update_flows(self, sheetname='flows'):
+        """
+        here we are using the same flows sheet spec as XlsxArchiveUpdater so we don't need to configure column mappings
+        :param sheetname:
+        :return:
+        """
+        sheet = self.xlsx[sheetname]
+        columns = ('external_ref', 'referenceQuantity', 'Name', 'Comment', 'Compartment')
+        write = [list(columns)]
+        exis = set()
+
+        def _make_a_row(_f):
+            cx = _f.context.name
+            if cx == 'None':
+                cx = None
+            return [_f.external_ref, _f.reference_entity['Name'], _f['Name'], _f['Comment'], cx]
+
+        # first, existing
+        for i in range(1, sheet.nrows):
+            row = [k.value for k in sheet.row(i)]
+            ssr = i + 1
+            if len(row) == 0 or row[0] is None:
+                write.append([None, None, None, None, None])
+                continue
+            try:
+                f = self.fg.get(row[0])
+                write.append(_make_a_row(f))
+                exis.add(f.external_ref)
+            except KeyError:
+                logging.warning('unrecognized flow in existing pass (%s row %d %s)' % (sheetname, ssr, row[0]))
+                write.append(row[:5])
+
+        # add new
+        added = 0
+        for f in self.fg.flows():
+            if f.external_ref in exis:
+                continue
+            added += 1
+            write.append(_make_a_row(f))
+        print('Writing %d existing and %d new flows to sheet %s' % (len(exis), added, sheetname))
+        self.xlsx.write_rectangle_by_rows(sheetname, write)
+
     # GENERIC
     def _get_one(self, hits, strict=False, prefix=None):
         """
@@ -281,7 +380,11 @@ class ModelMaker(QuickAndEasy):
                     print('%d: skipping bad ref_value %s' % (ssr, row['ref_value']))
                     continue
                 ru = row.get('ref_unit')
-                self.fg.observe(ref, exchange_value=rv, units=ru)
+                try:
+                    self.fg.observe(ref, exchange_value=rv, units=ru)
+                except ConversionError:
+                    print('%d: Skipping bad unit conversion specification %s [%s]' % (ssr, ru,
+                                                                                      ref.flow.reference_entity))
 
     def _make_production_childflows(self, sheet, prefix=None):
         for r in range(1, sheet.nrows):

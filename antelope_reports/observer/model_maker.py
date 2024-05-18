@@ -1,4 +1,5 @@
-from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, check_direction, ConversionError
+from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, ConversionError
+from antelope.interfaces.iindex import InvalidDirection, comp_dir, check_direction
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
 import logging
@@ -325,8 +326,17 @@ class ModelMaker(QuickAndEasy):
             else:
                 raise NoInformation
 
-        child_direction = check_direction(row['direction'])
-        if child_direction == 'balance' or row['balance_yn']:
+        try:
+            child_direction = check_direction(row['direction'])
+        except InvalidDirection:
+            if hasattr(rx, 'direction'):
+                child_direction = comp_dir(rx.direction)
+            elif hasattr(rx, 'sense'):
+                child_direction = comp_dir(rx.sense)
+            else:
+                child_direction = parent.direction
+
+        if row['balance_yn']:  # or child_direction == 'balance'
             balance = True
         else:
             balance = False
@@ -347,7 +357,10 @@ class ModelMaker(QuickAndEasy):
                 ev = float(row['amount'])
             except (TypeError, ValueError):
                 raise BadExchangeValue(row.get('amount'))
-            self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
+            try:
+                self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
+            except ConversionError:
+                raise BadExchangeValue(c.flow.reference_entity, row['units'])
         c.terminate(rx, scenario=row.get('scenario'), descend=False)
 
         if row.get('stage_name'):

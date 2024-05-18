@@ -2,8 +2,9 @@ from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope_core.contexts import NullContext
 from antelope import ConversionError
-from antelope.exchanges_from_spreadsheet import exchanges_from_spreadsheet
 from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
+
+from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
 

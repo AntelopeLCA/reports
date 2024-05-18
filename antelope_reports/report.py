@@ -1,5 +1,7 @@
 """
-This file is used to cast a fragment to TeX.  The output is a TeX file in an include folder which draws
+An object lesson in what happens when you don't learn about existing tools (of the vintage: jinja2)
+
+This file [was] used to cast a fragment to TeX.  The output is a TeX file in an include folder which draws
 a fragment as a tree diagram using PSTricks.
 
 I guess for research on this, I should start by actually drawing a fragment by hand

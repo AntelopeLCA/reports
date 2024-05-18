@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "antelope_reports"
+authors =[
+    {name = "Brandon Kuczenski", email="brandon@scope3consulting.com"}
+]
+description = "Tools for summarizing and visualizing LCA models in Antelope"
+readme ={ file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.6"
+keywords = ["antelope", "waterfall", "bar chart", "model runner", "scenario", "lca study"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+         "Development Status :: 3 - Alpha",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: BSD License",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Topic :: Scientific/Engineering"
+]
+dependencies = [
+    "antelope-foreground >= 0.3.1",
+    "antelope-core >= 0.3.1",
+    "synonym-dict >= 0.2.4",
+    "pandas",
+    "matplotlib"
+]
+version = "0.1.1post99"
+urls = ["https://github.com/AntelopeLCA/reports"]

@@ -1,4 +1,3 @@
-from .tables import FlowablesGrid
 from .observer import QuickAndEasy, MissingValue
 
 from time import time

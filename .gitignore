@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+antelope_reports/mfa_models/
+antelope_reports/tables/old/

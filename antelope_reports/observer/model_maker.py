@@ -71,7 +71,7 @@ class ModelMaker(QuickAndEasy):
     (these are used in _find_term_info(), ultimately passed to find_background_rx()
     origin	-- origin for anchor node (context or cutoff if absent)
     compartment	-- used for context flows if origin is not specified
-    term_flow	-- passed to find_background_rx as flow_name
+    flow_name -- passed to find_background_rx
     locale	-- used as SpatialScope argument in find_background_rx
     target_name	-- used as process_name argument in find_background_rx
     external_ref	-- passed to find_background_rx
@@ -115,6 +115,12 @@ class ModelMaker(QuickAndEasy):
     dp_ocean	-- ocean transport for massive dp flows, using truck transport target specified by trans_ocean
 
     """
+    def __init__(self, *args, **kwargs):
+        super(ModelMaker, self).__init__(*args, **kwargs)
+
+        self._skips = []
+        self._errors = dict()
+
     def autodetect_flows(self, sheetname, external_ref=None, ref_quantity=None, ref_unit=None, name=None,
                          context=None, entity_uuid=None, **kwargs):
         """
@@ -280,7 +286,7 @@ class ModelMaker(QuickAndEasy):
 
             d = {'external_ref': row.get('external_ref'),
                  'process_name': row.get('target_name'),
-                 'flow_name': row.get('term_flow') or row.get('child_flow'),
+                 'flow_name': row.get('flow_name') or row.get('child_flow') or row.get('term_flow'),
                  'SpatialScope': row.get('locale')}  # default to RoW
 
             try:
@@ -317,7 +323,7 @@ class ModelMaker(QuickAndEasy):
 
         rx = self._find_term_info(row)
 
-        cf_ref = row.get('child_flow') or row.get('term_flow')
+        cf_ref = row.get('flow_name') or row.get('child_flow') or row.get('term_flow')
         if cf_ref:
             child_flow = self.fg.get_local(cf_ref)
         else:
@@ -371,6 +377,12 @@ class ModelMaker(QuickAndEasy):
             c['Comment'] = row['Comment']
         return c
 
+    def _log_e(self, ssr, e):
+        if ssr in self._errors:
+            logging.warning('double error %s' % ssr)
+        else:
+            self._errors[ssr] = e
+
     def _make_production_references(self, sheet, prefix):
         for r in range(1, sheet.nrows):
             ssr = r + 1
@@ -383,14 +395,17 @@ class ModelMaker(QuickAndEasy):
                     ref = self.create_or_retrieve_reference(row['prod_flow'], dirn, prefix=prefix)
                 except EntityNotFound as e:
                     print('%d: unrecognized reference flow %s' % (ssr, e.args))
+                    self._log_e(ssr, e)
                     continue
                 try:
                     rv = float(row['ref_value'])
                 except KeyError:
                     print('%d: skipping omitted ref_value' % ssr)
+                    self._skips.append(ssr)
                     continue
                 except (TypeError, ValueError):
                     print('%d: skipping bad ref_value %s' % (ssr, row['ref_value']))
+                    self._skips.append(ssr)
                     continue
                 ru = row.get('ref_unit')
                 try:
@@ -408,18 +423,25 @@ class ModelMaker(QuickAndEasy):
                     c = self.make_production_row(row, prefix)
                     print('%d: %s' % (ssr, c))
                 except NoInformation:
+                    self._skips.append(ssr)
                     print('%d: No information for cutoff' % ssr)
                 except FailedTermination as e:
+                    self._log_e(ssr, e)
                     print('%d: Failed Termination %s' % (ssr, e.args))
                 except AmbiguousResult as e:
+                    self._log_e(ssr, e)
                     print('%d: Ambiguous Result %s' % (ssr, e.args))
                 except UnknownOrigin as e:
+                    self._log_e(ssr, e)
                     print('%d: Unknown Origin %s' % (ssr, e.args))
                 except MultipleReferences as e:
+                    self._log_e(ssr, e)
                     print('%d: Multiple References %s' % (ssr, e.args))
                 except BadExchangeValue as e:
+                    self._log_e(ssr, e)
                     print('%d: Bad Exchange Value %s' % (ssr, e.args))
                 except EntityNotFound as e:
+                    self._log_e(ssr, e)
                     print('%d: wayward entity-not-found error %s' % (ssr, e.args))
 
     def make_production(self, sheetname='production', prefix='prod'):

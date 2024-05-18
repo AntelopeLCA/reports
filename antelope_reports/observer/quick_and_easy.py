@@ -98,7 +98,8 @@ class QuickAndEasy(object):
                 self._terms[k] = self.fg.catalog_ref(*v)
 
     def _populate_unit_map(self):
-        for q_can in ('mass', 'volume', 'net calorific value', 'number of items'):
+        for q_can in ('mass', 'volume', 'net calorific value', 'number of items',
+                      'freight', 'vehicle transport', 'person transport'):  # last one stated wins
             q = self.fg.get_canonical(q_can)
             for u in q['unitconversion'].keys():
                 self._unit_map[u] = q.external_ref

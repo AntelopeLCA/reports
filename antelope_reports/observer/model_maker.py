@@ -3,6 +3,7 @@ from antelope.interfaces.iindex import InvalidDirection, comp_dir, check_directi
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
 import logging
+from collections import defaultdict
 
 
 class ConsistencyError(Exception):
@@ -120,6 +121,20 @@ class ModelMaker(QuickAndEasy):
 
         self._skips = []
         self._errors = dict()
+
+    @property
+    def skips(self):
+        return list(self._skips)
+
+    @property
+    def errors(self):
+        d = defaultdict(list)
+        for k, e in self._errors.items():
+            d[e.__class__.__name__].append(k)
+        return dict(d)
+
+    def error(self, k):
+        return self._errors[k]
 
     def autodetect_flows(self, sheetname, external_ref=None, ref_quantity=None, ref_unit=None, name=None,
                          context=None, entity_uuid=None, **kwargs):
@@ -323,14 +338,17 @@ class ModelMaker(QuickAndEasy):
 
         rx = self._find_term_info(row)
 
-        cf_ref = row.get('flow_name') or row.get('child_flow') or row.get('term_flow')
-        if cf_ref:
-            child_flow = self.fg.get_local(cf_ref)
+        if hasattr(rx, 'flow'):
+            child_flow = rx.flow
         else:
-            if hasattr(rx, 'flow'):
-                child_flow = rx.flow
+            cf_ref = row.get('flow_name') or row.get('child_flow') or row.get('term_flow')
+            if cf_ref:
+                child_flow = self.fg.get_local(cf_ref)
             else:
-                raise NoInformation
+                if hasattr(rx, 'flow'):
+                    child_flow = rx.flow
+                else:
+                    raise NoInformation
 
         try:
             child_direction = check_direction(row['direction'])
@@ -421,28 +439,28 @@ class ModelMaker(QuickAndEasy):
             if row.get('prod_flow'):
                 try:
                     c = self.make_production_row(row, prefix)
-                    print('%d: %s' % (ssr, c))
+                    print('== %03d ==: %s' % (ssr, c))
                 except NoInformation:
                     self._skips.append(ssr)
-                    print('%d: No information for cutoff' % ssr)
+                    print('## %03d ##: No information for cutoff' % ssr)
                 except FailedTermination as e:
                     self._log_e(ssr, e)
-                    print('%d: Failed Termination %s' % (ssr, e.args))
+                    print('## %03d ##: Failed Termination %s' % (ssr, e.args))
                 except AmbiguousResult as e:
                     self._log_e(ssr, e)
-                    print('%d: Ambiguous Result %s' % (ssr, e.args))
+                    print('## %03d ##: Ambiguous Result %s' % (ssr, e.args))
                 except UnknownOrigin as e:
                     self._log_e(ssr, e)
-                    print('%d: Unknown Origin %s' % (ssr, e.args))
+                    print('## %03d ##: Unknown Origin %s' % (ssr, e.args))
                 except MultipleReferences as e:
                     self._log_e(ssr, e)
-                    print('%d: Multiple References %s' % (ssr, e.args))
+                    print('## %03d ##: Multiple References %s' % (ssr, e.args))
                 except BadExchangeValue as e:
                     self._log_e(ssr, e)
-                    print('%d: Bad Exchange Value %s' % (ssr, e.args))
+                    print('## %03d ##: Bad Exchange Value %s' % (ssr, e.args))
                 except EntityNotFound as e:
                     self._log_e(ssr, e)
-                    print('%d: wayward entity-not-found error %s' % (ssr, e.args))
+                    print('## %03d ##: wayward entity-not-found error %s' % (ssr, e.args))
 
     def make_production(self, sheetname='production', prefix='prod'):
         """

@@ -7,6 +7,7 @@ from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
+import locale
 
 tr = str.maketrans(' ', '_', ',[]()*&^%$#@')
 
@@ -111,7 +112,7 @@ class QuickAndEasy(object):
             except ConversionError:
                 pass
 
-    def __init__(self, fg, terms=None, xlsx=None):
+    def __init__(self, fg, terms=None, xlsx=None, setlocale=None):
         """
         A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
         origin + external ref, and an optional XlrdLike spreadsheet
@@ -119,6 +120,7 @@ class QuickAndEasy(object):
         :param terms:
         :param xlsx:
         """
+        locale.setlocale(locale.LC_ALL, setlocale)  # required for atof to work in exchanges_from_spreadsheet
         self._fg = fg
         self._terms = {}
         self._xlsx = None

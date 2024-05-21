@@ -5,6 +5,8 @@ This module provides a routine that generates a list of exchange refs from a pro
 from antelope import check_direction, CatalogRef, ExchangeRef
 from antelope.interfaces import InvalidDirection
 
+import locale
+
 
 class ValueIsBalance(Exception):
     """
@@ -68,7 +70,12 @@ def _exchange_params(origin, rowdict):
     else:
         try:
             value = float(val)
-        except (ValueError, TypeError):
+        except ValueError:
+            try:
+                value = locale.atof(val)
+            except ValueError:
+                value = 0.0
+        except TypeError:
             value = 0.0
     unit = _popanykey(rowdict, 'unit', 'units')
     term = _popanykey(rowdict, 'context', 'compartment', 'target',
@@ -157,10 +164,15 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
 
     for row in range(2, sheetlike.nrows):
         c_flow = _row_dict(sheetlike, row)
+        if len(c_flow) == 0:
+            continue
         try:
             flow_ref, dirn, value, units, term = _exchange_params(origin, c_flow)
-        except (KeyError, InvalidDirection):
-            print('Skipping poorly defined row %d\n%s' % (row, c_flow))
+        except KeyError as e:
+            print('==Row %02d== SKIP  missing one of %s' % (row+1, e.args))
+            continue
+        except InvalidDirection as e:
+            print('==Row %02d== SKIP  invalid direction %s' % (row+1, e.args))
             continue
 
         if value is ValueIsBalance:

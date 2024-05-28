@@ -99,11 +99,10 @@ class QuickAndEasy(object):
                 self._terms[k] = self.fg.catalog_ref(*v)
 
     def _populate_unit_map(self):
-        for q_can in ('mass', 'volume', 'net calorific value', 'number of items',
-                      'freight', 'vehicle transport', 'person transport'):  # last one stated wins
-            q = self.fg.get_canonical(q_can)
-            for u in q['unitconversion'].keys():
-                self._unit_map[u] = q.external_ref
+        for q in ('mass', 'volume', 'net calorific value', 'number of items',
+                  'length', 'area', 'freight', 'vehicle transport', 'person transport'):  # last one stated wins
+            q_can = self.fg.get_canonical(q)
+            self.add_to_unit_map(q_can)
         kwh = self.fg.get_canonical('kWh')
         for u in ('kWh', 'MWh', 'GWh'):
             try:
@@ -112,7 +111,11 @@ class QuickAndEasy(object):
             except ConversionError:
                 pass
 
-    def __init__(self, fg, terms=None, xlsx=None, setlocale=None):
+    def add_to_unit_map(self, quantity):
+        for u in quantity['unitconversion'].keys():
+            self._unit_map[u] = quantity.external_ref
+
+    def __init__(self, fg, terms=None, xlsx=None):
         """
         A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
         origin + external ref, and an optional XlrdLike spreadsheet
@@ -120,7 +123,7 @@ class QuickAndEasy(object):
         :param terms:
         :param xlsx:
         """
-        locale.setlocale(locale.LC_ALL, setlocale)  # required for atof to work in exchanges_from_spreadsheet
+        locale.setlocale(locale.LC_ALL, locale.getdefaultlocale())  # required for atof to work in exchanges_from_spreadsheet
         self._fg = fg
         self._terms = {}
         self._xlsx = None
@@ -156,7 +159,8 @@ class QuickAndEasy(object):
     def terms(self, term):
         return self._terms[term]
 
-    def find_background_rx(self, origin, external_ref=None, process_name=None, flow_name=None, strict=True, **kwargs):
+    def find_background_rx(self, origin, external_ref=None, process_name=None, flow_name_or_ref=None, strict=True,
+                           **kwargs):
         """
         The purpose of this is to retrieve a unique termination from a user specification. 
         Order of preference here is as follows:
@@ -168,8 +172,8 @@ class QuickAndEasy(object):
         
         :param origin: 
         :param external_ref: 
-        :param process_name: 
-        :param flow_name: 
+        :param process_name: exact name of background process
+        :param flow_name_or_ref: exact flow name OR external ref of flow
         :param strict: [True] If true, raise an AmbiguousResult exception if multiple hits are found; if False, go
          ahead and use the "first" (which is nondetermininstic).  Provide kwargs to filter.
         :param kwargs: 
@@ -184,12 +188,12 @@ class QuickAndEasy(object):
                     term = self._get_one(query.processes(Name='^%s$' % process_name, **kwargs), strict=strict)
                 except EntityNotFound:
                     term = self._get_one(query.processes(Name='^%s' % process_name, **kwargs), strict=strict)
-            elif flow_name:
+            elif flow_name_or_ref:
                 try:
-                    flow = query.get(flow_name)
+                    flow = query.get(flow_name_or_ref)
                 except EntityNotFound:
                     flows = filter(lambda x: not self.fg.context(x.context).elementary,
-                                   query.flows(Name='^%s$' % flow_name))
+                                   query.flows(Name='^%s$' % flow_name_or_ref))
                     flow = self._get_one(flows, strict=strict)
 
                 if hasattr(query, 'fragments_with_flow'):
@@ -207,7 +211,7 @@ class QuickAndEasy(object):
         try:
             return term.reference()
         except MultipleReferences:
-            return term.reference(flow_name)
+            return term.reference(flow_name_or_ref)
 
     def _new_reference_fragment(self, flow, direction, external_ref):
         frag = self.fg[external_ref]
@@ -272,6 +276,7 @@ class QuickAndEasy(object):
 
         return frag
 
+    '''
     def to_background(self, bg, origin, external_ref=None, process_name=None, flow_name=None, locale=None,
                       scenario=None,
                       scaleup=1.0,
@@ -281,14 +286,14 @@ class QuickAndEasy(object):
         :param bg:
         :param origin:
         :param external_ref:
-        :param process_name:
-        :param flow_name:
+        :param process_name: exact name of process
+        :param flow_name: exact name or ref of flow
         :param locale:
         :param scenario:
         :param scaleup:
         :return:
         """
-        kwargs.update({'process_name': process_name, 'flow_name': flow_name, 'external_ref': external_ref})
+        kwargs.update({'process_name': process_name, 'flow_name_or_ref': flow_name, 'external_ref': external_ref})
         if locale:
             kwargs['SpatialScope'] = locale
 
@@ -310,6 +315,7 @@ class QuickAndEasy(object):
             ev = bg.exchange_value(scenario, observed=True) * scaleup_adj
             self.fg.observe(z, exchange_value=ev, scenario=scenario)
             z.terminate(NullContext)  # truncates
+    '''
 
     def add_tap(self, parent, child_flow, direction='Input', scenario=None, term=None, term_flow=None,
                 include_zero=False, **kwargs):

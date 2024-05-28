@@ -62,7 +62,7 @@ class ModelMaker(QuickAndEasy):
     amount_hi	-- observed exchange value for high sensitivity case (not yet implemented)
     amount_lo	-- observed exchange value for high sensitivity case (not yet implemented)
     units	-- unit of measure for amount, amount_hi, amount_lo
-    child_flow  -- optional external ref of child flow
+    child_flow  -- external ref of child flow (if blank, will be taken from anchor)
     stage_name	-- fragment 'StageName' property
     scenario	-- support for alternative exchange value + anchor scenario specifications (not yet implemented)
     note	-- fragment 'note' property
@@ -70,21 +70,21 @@ class ModelMaker(QuickAndEasy):
 
     anchor spec:
     (these are used in _find_term_info(), ultimately passed to find_background_rx()
-    origin	-- origin for anchor node (context or cutoff if absent)
+    target_origin	-- origin for anchor node (context or cutoff if absent)
     compartment	-- used for context flows if origin is not specified
-    flow_name -- passed to find_background_rx
+    target_flow -- passed to find_background_rx as flow_name_or_ref (if blank, use child_flow if specified)
     locale	-- used as SpatialScope argument in find_background_rx
     target_name	-- used as process_name argument in find_background_rx
-    external_ref	-- passed to find_background_rx
+    target_ref	-- passed to find_background_rx as external_ref
 
     The regression is as follows:
       if origin is specified: row describes an anchored flow
          origin == 'here' -> look in local foreground
          pass a dict to find_background_rx containing:
-         external_ref, target_name (as process_name), flow_name, locale (as SpatialScope)
+         target_ref (as external_ref), target_name (as process_name), flow_name_or_ref, locale (as SpatialScope)
       else:
          row describes either a cutoff or an exterior (context / environment) flow
-         flow_name is retrieved using get_local(). no other columns are used other than compartment (maybe locale)
+         flow_name_or_ref is retrieved using get_local(). no other columns are used other than compartment (maybe locale)
          if compartment is specified:
             retrieve context
          else:
@@ -223,6 +223,9 @@ class ModelMaker(QuickAndEasy):
             except KeyError:
                 logging.warning('unrecognized flow in existing pass (%s row %d %s)' % (sheetname, ssr, row[0]))
                 write.append(row[:5])
+            except TypeError:
+                logging.warning('TypeError problem in existing pass (%s row %d %s)' % (sheetname, ssr, row[0]))
+                write.append(row[:5])
 
         # add new
         added = 0
@@ -292,16 +295,16 @@ class ModelMaker(QuickAndEasy):
 
     def _find_term_info(self, row):
         # first, find termination
-        org = row.get('origin')
+        org = row.get('target_origin') or row.get('origin')
         if org:
             if org == 'here':
                 origin = self.fg.origin
             else:
                 origin = org
 
-            d = {'external_ref': row.get('external_ref'),
+            d = {'external_ref': row.get('target_ref') or row.get('external_ref'),
                  'process_name': row.get('target_name'),
-                 'flow_name': row.get('flow_name') or row.get('child_flow') or row.get('term_flow'),
+                 'flow_name_or_ref': row.get('target_flow') or row.get('term_flow') or row.get('flow_name') or row.get('child_flow'),
                  'SpatialScope': row.get('locale')}  # default to RoW
 
             try:
@@ -311,7 +314,14 @@ class ModelMaker(QuickAndEasy):
                     d['SpatialScope'] = 'RoW'
                     rx = self.find_background_rx(origin, **d)
                 else:
-                    raise AmbiguousResult(*d.values())
+                    if not d['SpatialScope'].startswith('^'):
+                        d['SpatialScope'] = '^%s$' % d['SpatialScope']
+                        try:
+                            rx = self.find_background_rx(origin, **d)
+                        except AmbiguousResult:
+                            raise AmbiguousResult(*d.values())
+                    else:
+                        raise AmbiguousResult(*d.values())
             except (KeyError, EntityNotFound):
                 raise FailedTermination(*d.values())
         else:
@@ -338,15 +348,15 @@ class ModelMaker(QuickAndEasy):
 
         rx = self._find_term_info(row)
 
-        if hasattr(rx, 'flow'):
-            child_flow = rx.flow
+        if row.get('child_flow'):
+            child_flow = self.fg.get_local(row.get('child_flow'))
         else:
-            cf_ref = row.get('flow_name') or row.get('child_flow') or row.get('term_flow')
-            if cf_ref:
-                child_flow = self.fg.get_local(cf_ref)
+            if hasattr(rx, 'flow'):
+                child_flow = rx.flow
             else:
-                if hasattr(rx, 'flow'):
-                    child_flow = rx.flow
+                cf_ref = row.get('flow_name') or row.get('term_flow')
+                if cf_ref:
+                    child_flow = self.fg.get_local(cf_ref)
                 else:
                     raise NoInformation
 
@@ -385,10 +395,13 @@ class ModelMaker(QuickAndEasy):
                 self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
             except ConversionError:
                 raise BadExchangeValue(c.flow.reference_entity, row['units'])
-        c.terminate(rx, scenario=row.get('scenario'), descend=False)
-
         if row.get('stage_name'):
             c['StageName'] = row['stage_name']
+            descend = False
+        else:
+            descend = True
+        c.terminate(rx, scenario=row.get('scenario'), descend=descend)
+
         if row.get('note'):
             c['note'] = row['note']
         if row.get('Comment'):
@@ -477,6 +490,7 @@ class ModelMaker(QuickAndEasy):
         """
         if self.xlsx is None:
             raise AttributeError('Please attach Google Sheet')
+        self._errors = dict()  # reset errors
 
         sheet = self.xlsx[sheetname]
 

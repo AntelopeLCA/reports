@@ -1,5 +1,6 @@
 from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, ConversionError
 from antelope.interfaces.iindex import InvalidDirection, comp_dir, check_direction
+from antelope_foreground.terminations import FlowConversionError
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
 import logging
@@ -474,6 +475,9 @@ class ModelMaker(QuickAndEasy):
                 except EntityNotFound as e:
                     self._log_e(ssr, e)
                     print('## %03d ##: wayward entity-not-found error %s' % (ssr, e.args))
+                except FlowConversionError as e:
+                    self._log_e(ssr, e)
+                    print('## %03d ##: flow-conversion termination error %s' % (ssr, e.args))
 
     def make_production(self, sheetname='production', prefix='prod'):
         """

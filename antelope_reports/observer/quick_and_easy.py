@@ -115,7 +115,7 @@ class QuickAndEasy(object):
         for u in quantity['unitconversion'].keys():
             self._unit_map[u] = quantity.external_ref
 
-    def __init__(self, fg, terms=None, xlsx=None):
+    def __init__(self, fg, terms=None, xlsx=None, quiet=True):
         """
         A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
         origin + external ref, and an optional XlrdLike spreadsheet
@@ -127,6 +127,7 @@ class QuickAndEasy(object):
         self._fg = fg
         self._terms = {}
         self._xlsx = None
+        self._quiet = quiet
         self.set_terms(terms)
         self._unit_map = dict()
         self._populate_unit_map()
@@ -147,9 +148,9 @@ class QuickAndEasy(object):
         """
         if xlsx:
             try:
-                self.fg.apply_xlsx(xlsx)
+                self.fg.apply_xlsx(xlsx, quiet=self._quiet)
             except AttributeError:
-                next(self.fg._iface('foreground')).apply_xlsx(xlsx)
+                next(self.fg._iface('foreground')).apply_xlsx(xlsx, quiet=self._quiet)
             self._xlsx = xlsx
 
     @property

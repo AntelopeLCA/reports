@@ -40,6 +40,13 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         for scenario in common_scenarios:
             self.add_common_scenario(scenario)
 
+    @property
+    def model(self):
+        return self._model
+
+    def params(self, scenario):
+        return self._params[scenario]
+
     def add_common_scenario(self, scenario):
         if isinstance(scenario, tuple):
             for sc in scenario:
@@ -94,7 +101,7 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         for k in sorted(self._common_scenarios):
             yield k
 
-    def add_case(self, case, params):
+    def add_case(self, case, *params):
         self.add_scenario(case)  # raises KeyError
         self._params[case] = self._scenario_tuple(params)
         self._recalculate_case(case)

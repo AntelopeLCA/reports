@@ -4,10 +4,11 @@ from antelope_core.contexts import NullContext
 from antelope import ConversionError
 from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 
+from antelope_reports.observer.observations_from_spreadsheet import ObservationsFromSpreadsheet
+
 from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
-import locale
 
 tr = str.maketrans(' ', '_', ',[]()*&^%$#@')
 
@@ -123,7 +124,6 @@ class QuickAndEasy(object):
         :param terms:
         :param xlsx:
         """
-        locale.setlocale(locale.LC_ALL, locale.getdefaultlocale())  # required for atof to work in exchanges_from_spreadsheet
         self._fg = fg
         self._terms = {}
         self._xlsx = None
@@ -147,15 +147,29 @@ class QuickAndEasy(object):
         :return:
         """
         if xlsx:
-            try:
-                self.fg.apply_xlsx(xlsx, quiet=self._quiet)
-            except AttributeError:
-                next(self.fg._iface('foreground')).apply_xlsx(xlsx, quiet=self._quiet)
             self._xlsx = xlsx
+            self.refresh_entities()
+
+    def refresh_entities(self, quiet=None):
+        if self._xlsx is None:
+            raise ValueError('xlsx is missing')
+        if quiet is None:
+            quiet = self._quiet
+        try:
+            self.fg.apply_xlsx(self._xlsx, quiet=quiet)
+        except AttributeError:
+            next(self.fg._iface('foreground')).apply_xlsx(self._xlsx, quiet=quiet)
 
     @property
     def fg(self):
         return self._fg
+
+    def __getitem__(self, item):
+        e = self.fg.__getitem__(item)
+        if e is None:
+            # the buck has to stop somewhere
+            raise KeyError(item)
+        return e
 
     def terms(self, term):
         return self._terms[term]
@@ -384,5 +398,11 @@ class QuickAndEasy(object):
 
         fproc.show_tree(True)
         return fproc
+
+    def apply_observations(self, sheetname='observations'):
+        scs = self.xlsx[sheetname]
+        with ObservationsFromSpreadsheet(self.fg, scs) as obs:
+            obs.apply()
+
 
 

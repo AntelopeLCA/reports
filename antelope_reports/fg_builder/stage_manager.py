@@ -18,6 +18,16 @@ class StageManager(object):
     _maps = None
     skip_values = {None, 0, 'NA'}
 
+    @classmethod
+    def from_fragment(cls, frag):
+        """
+        Creates (or updates) a StageManager spreadsheet based on the stages encountered in one fragment and its
+        child fragments
+        :param frag:
+        :return:
+        """
+        return NotImplemented
+
     def __init__(self, xlsx, sheetname='stage_names', write=True, default_name='StageName', ignore_case=True):
         self._xlsx = xlsx
         self._sheetname = sheetname
@@ -29,8 +39,8 @@ class StageManager(object):
             else:
                 raise KeyError('Sheet %s is missing and write is disabled' % sheetname)
 
-        self._maps = []
-        self._default = default_name
+        self._maps = []  # the list of column headers-- these correspond to different mappings of the same set of stages
+        self._default = default_name  # the
         self._mappings = dict()
         self._sd = SynonymDict(ignore_case=ignore_case)
         self._sd._ignore_case = ignore_case
@@ -71,7 +81,7 @@ class StageManager(object):
         except KeyError:
             # create-- prune = True because
             ent = self._sd.new_entry(default, *self._values(row), prune=True)
-            return ent.object
+            return ent.object  # a synonym set
 
     def read_mappings(self):
         self._sheet = self._xlsx.sheet_by_name(self._sheetname)

@@ -122,13 +122,15 @@ class SensitivityRunner(ScenarioRunner):
                 self._results_lo[scenario, lcia_method],
                 self._results_hi[scenario, lcia_method])
 
-    results_headings = ('scenario', 'stage', 'method', 'category', 'indicator', 'result', 'result_lo', 'result_hi', 'units')
+    @property
+    def results_headings(self):
+        return ['scenario', 'stage', 'alt_stage', 'method', 'category', 'indicator', 'result', 'result_lo', 'result_hi', 'units']
 
-    def _gen_aggregated_lcia_rows(self, scenario, q, include_total=False):
+    def _gen_lcia_rows(self, scenario, q, include_total=False, aggregate=True, **kwargs):
         """
         This is really complicated because we don't know (or don't want to assume) that the three scores will have
         the same stages-- because low and hi scenarios could trigger different traversals / terminations.
-        maybe this is paranoid.
+
         it certainly makes the code look like hell.
         the code makes an open ended dict of stages, with a subdict of result, result_lo, result_hi
         these get populated only when encountered, and output only when present.
@@ -137,17 +139,28 @@ class SensitivityRunner(ScenarioRunner):
         :param include_total:
         :return:
         """
-
-        ress = [k.aggregate(key=self._agg) for k in self.sens_result(scenario, q)]
         keys = defaultdict(dict)
-        for i, res in enumerate(ress):
-            for c in res.components():
-                keys[c.entity][self.sens_order[i]] = c.cumulative_result
+        if aggregate:
+            ress = [k.aggregate(key=self._agg) for k in self.sens_result(scenario, q)]
+            for i, res in enumerate(ress):
+                for c in res.components():
+                    keys[c.entity][self.sens_order[i]] = c.cumulative_result
+        else:
+            ress = [k for k in self.sens_result(scenario, q)]
+            for i, res in enumerate(ress):
+                for c in res.components():
+                    stgs = self._agg(c.entity)
+                    keys[stgs, c.uuid][self.sens_order[i]] = c.cumulative_result
 
-        for stage, result in sorted(keys.items(), key=lambda x: x[0]):
+        for key, result in sorted(keys.items(), key=lambda x: x[0]):
+            if aggregate:
+                stage, alt_stage = key
+            else:
+                stage, alt_stage = key[0]  # double packed
             d = {
                 'scenario': str(scenario),
                 'stage': stage,
+                'alt_stage': alt_stage,
                 'result': None,
                 'result_lo': None,
                 'result_hi': None

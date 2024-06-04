@@ -57,11 +57,12 @@ def weigh_lcia_results(quantity, *args, weight=None):
 
 
 class LcaModelRunner(object):
-    _agg = None
+    _agg_key = None
+    _alt_agg_key = None
     _seen_stages = None
     _fmt = '%.10e'
 
-    def __init__(self, agg_key=None):
+    def __init__(self, agg_key=None, alt_agg_key=None):
         """
 
         :param agg_key: default is StageName
@@ -75,11 +76,12 @@ class LcaModelRunner(object):
 
         self._results = dict()
         self.set_agg_key(agg_key)
+        self.set_alt_agg_key(alt_agg_key)
 
-    def recalculate(self):
+    def recalculate(self, **kwargs):
         self._results = dict()
         for lm in self.lcia_methods:
-            self.run_lcia(lm)
+            self.run_lcia(lm, **kwargs)
         for w in self.weightings:
             self._run_weighting(w)
 
@@ -93,10 +95,23 @@ class LcaModelRunner(object):
 
     def set_agg_key(self, agg_key=None):
         if agg_key is None:
-            agg_key = lambda x: x.fragment['StageName']
+            agg_key = lambda x: x.name
 
-        self._agg = agg_key
+        self._agg_key = agg_key
         self._seen_stages = defaultdict(set)  # reset
+
+    def set_alt_agg_key(self, alt_agg_key=None):
+        self._alt_agg_key = alt_agg_key
+        self._seen_stages = defaultdict(set)
+
+    def _agg(self, entity):
+        """
+        returns either a single or a tuple
+        :return:
+        """
+        if self._alt_agg_key is None:
+            return self._agg_key(entity), None
+        return self._agg_key(entity), self._alt_agg_key(entity)
 
     def _scenario_index(self, scenario):
         return scenario
@@ -238,12 +253,14 @@ class LcaModelRunner(object):
         st_name = '_csv_format_%s' % style
         if hasattr(self, st_name):
             return getattr(self, st_name)()
-        return self.results_headings, self._gen_aggregated_lcia_rows
+        return self.results_headings, self._gen_lcia_rows
 
-    results_headings = ['scenario', 'stage', 'method', 'category', 'indicator', 'result', 'units']
+    @property
+    def results_headings(self):
+        return ['scenario', 'stage', 'alt_stage', 'method', 'category', 'indicator', 'result', 'units']
 
     # tabular for all: accept *args as result items, go through them one by one
-    def results_to_csv(self, filename, scenarios=None, style=None, **kwargs):
+    def results_to_csv(self, filename, scenarios=None, style=None, aggregate=True, **kwargs):
         if scenarios is None:
             scenarios = sorted(self.scenarios)
         else:
@@ -258,7 +275,7 @@ class LcaModelRunner(object):
 
             for q in self.quantities:
                 for scenario in scenarios:
-                    for k in agg(scenario, q, **kwargs):
+                    for k in agg(scenario, q, aggregate=aggregate, **kwargs):
                         cvf.writerow(k)
 
     @staticmethod
@@ -269,14 +286,23 @@ class LcaModelRunner(object):
         k['units'] = q.unit
         return k
 
-    def _gen_aggregated_lcia_rows(self, scenario, q, include_total=False):
+    def _gen_lcia_rows(self, scenario, q, include_total=False, aggregate=True, **kwargs):
         res = self._results[scenario, q]
-        for c in sorted(res.aggregate(key=self._agg).components(), key=lambda x: x.entity):
-            stage = c.entity
+        if aggregate:
+            _it = sorted(res.aggregate(key=self._agg).components(), key=lambda x: x.entity)
+        else:
+            _it = sorted(res.components(), key=lambda x: self._agg(x.entity))
+        for c in _it:
+            if aggregate:
+                stage, alt_stage = c.entity
+            else:
+                stage, alt_stage = self._agg(c.entity)
+
             result = c.cumulative_result
             yield self._gen_row(q, {
                 'scenario': str(scenario),
                 'stage': stage,
+                'alt_stage': alt_stage,
                 'result': self._format(result)
             })
         if include_total:

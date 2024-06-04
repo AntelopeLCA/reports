@@ -3,6 +3,7 @@ from antelope.interfaces.iindex import InvalidDirection, comp_dir, check_directi
 from antelope_foreground.terminations import FlowConversionError
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
+from .float_conv import to_float, try_float
 import logging
 from collections import defaultdict
 
@@ -203,6 +204,7 @@ class ModelMaker(QuickAndEasy):
         columns = ('external_ref', 'referenceQuantity', 'Name', 'Comment', 'Compartment')
         write = [list(columns)]
         exis = set()
+        error = 0
 
         def _make_a_row(_f):
             cx = _f.context.name
@@ -226,16 +228,25 @@ class ModelMaker(QuickAndEasy):
                 write.append(row[:5])
             except TypeError:
                 logging.warning('TypeError problem in existing pass (%s row %d %s)' % (sheetname, ssr, row[0]))
-                write.append(row[:5])
+                error += 1
 
         # add new
         added = 0
         for f in self.fg.flows():
+            if f.origin != self.fg.origin:
+                continue
             if f.external_ref in exis:
                 continue
-            added += 1
-            write.append(_make_a_row(f))
-        print('Writing %d existing and %d new flows to sheet %s' % (len(exis), added, sheetname))
+            try:
+                write.append(_make_a_row(f))
+                added += 1
+            except TypeError:
+                logging.warning('TypeError problem - skipping new flow %s' % f.external_ref)
+                error += 1
+        msg = 'Writing %d existing and %d new flows to sheet %s' % (len(exis), added, sheetname)
+        if error:
+            msg += ' (%d errors)' % error
+        print(msg)
         self.xlsx.write_rectangle_by_rows(sheetname, write)
 
     # GENERIC
@@ -335,17 +346,17 @@ class ModelMaker(QuickAndEasy):
 
         return rx
 
-    def make_production_row(self, row, prefix=None):
+    def _build_production_row(self, parent, row):
         """
         I probably should break this down a little better--- so many precedence rules + heuristics
         basically, we want to do the following:
          - terminate to a foreground process: specify 'here' origin and either flow_name or external_ref
          - terminate to a cutoff: specify no origin and flow_name
-        :param row:
-        :param prefix: naming convention for created fragments
+
+        :param parent: parent fragment
+        :param row: row_dict
         :return:
         """
-        parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
 
         rx = self._find_term_info(row)
 
@@ -385,11 +396,14 @@ class ModelMaker(QuickAndEasy):
                 else:
                     c.set_balance_flow()
         except StopIteration:
+            if balance:
+                if parent.balance_flow:
+                    parent.balance_flow.unset_balance_flow()
             c = self.fg.new_fragment(child_flow, child_direction, parent=parent, balance=balance)
 
         if not balance:
             try:
-                ev = float(row['amount'])
+                ev = to_float(row['amount'])
             except (TypeError, ValueError):
                 raise BadExchangeValue(row.get('amount'))
             try:
@@ -416,6 +430,7 @@ class ModelMaker(QuickAndEasy):
             self._errors[ssr] = e
 
     def _make_production_references(self, sheet, prefix):
+        refs = set()
         for r in range(1, sheet.nrows):
             ssr = r + 1
             # ASSUMPTION: prod_flow is first column
@@ -425,12 +440,13 @@ class ModelMaker(QuickAndEasy):
                 dirn = row.get('ref_direction', 'Output') or 'Output'
                 try:
                     ref = self.create_or_retrieve_reference(row['prod_flow'], dirn, prefix=prefix)
+                    refs.add(row['prod_flow'])
                 except EntityNotFound as e:
                     print('%d: unrecognized reference flow %s' % (ssr, e.args))
                     self._log_e(ssr, e)
                     continue
                 try:
-                    rv = float(row['ref_value'])
+                    rv = try_float(row['ref_value'])
                 except KeyError:
                     print('%d: skipping omitted ref_value' % ssr)
                     self._skips.append(ssr)
@@ -445,15 +461,19 @@ class ModelMaker(QuickAndEasy):
                 except ConversionError:
                     print('%d: Skipping bad unit conversion specification %s [%s]' % (ssr, ru,
                                                                                       ref.flow.reference_entity))
+        return len(refs)
 
     def _make_production_childflows(self, sheet, prefix=None):
+        count = 0
         for r in range(1, sheet.nrows):
             ssr = r + 1
             row = sheet.row_dict(r)
             if row.get('prod_flow'):
                 try:
-                    c = self.make_production_row(row, prefix)
+                    parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
+                    c = self._build_production_row(parent, row)
                     print('== %03d ==: %s' % (ssr, c))
+                    count += 1
                 except NoInformation:
                     self._skips.append(ssr)
                     print('## %03d ##: No information for cutoff' % ssr)
@@ -478,6 +498,7 @@ class ModelMaker(QuickAndEasy):
                 except FlowConversionError as e:
                     self._log_e(ssr, e)
                     print('## %03d ##: flow-conversion termination error %s' % (ssr, e.args))
+        return count
 
     def make_production(self, sheetname='production', prefix='prod'):
         """
@@ -499,10 +520,36 @@ class ModelMaker(QuickAndEasy):
         sheet = self.xlsx[sheetname]
 
         # first pass: create all production fragments
-        self._make_production_references(sheet, prefix)
+        refs = self._make_production_references(sheet, prefix)
 
         # second pass: create child flows
-        self._make_production_childflows(sheet, prefix)
+        count = self._make_production_childflows(sheet, prefix)
+        print('Created %d reference flows with %d child flows (%d errors)' % (refs, count, len(self._errors)))
+
+    def make_production_row(self, ssr, sheetname='production', prefix='prod'):
+        """
+        
+        :param ssr: spreadsheet row 
+        :param sheetname: 
+        :param prefix: 
+        :return: 
+        """
+        if self.xlsx is None:
+            raise AttributeError('Please attach Google Sheet')
+        self._errors = dict()  # reset errors
+
+        sheet = self.xlsx[sheetname]
+        row = sheet.row_dict(ssr - 1)
+
+        # update parent
+        parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
+        rv = try_float(row['ref_value'])
+        ru = row.get('ref_unit')
+        self.fg.observe(parent, exchange_value=rv, units=ru)
+
+        # build child
+        c = self._build_production_row(parent, row)
+        print('== %03d ==: %s' % (ssr, c))
 
     def _check_alpha_beta_prod(self, node, row_dict):
         """
@@ -649,7 +696,7 @@ class ModelMaker(QuickAndEasy):
             if td.reference_entity is mass:
                 # then we can do transport--- only doing transport for massive flows
                 if truck_mdl:
-                    cf = self._check_transport_link(node, truck_mdl, float(row['md_truck']),
+                    cf = self._check_transport_link(node, truck_mdl, to_float(row['md_truck']),
                                                     stage_name='Transport, %s' % td.name)
                     cf['stage_name'] = 'Transport, Products'  # stage_name kwarg becomes StageName
                 else:
@@ -664,14 +711,14 @@ class ModelMaker(QuickAndEasy):
 
             if row.get('dp_truck'):
                 if truck_mdl:
-                    self._check_transport_link(disp, truck_mdl, float(row['dp_truck']),
+                    self._check_transport_link(disp, truck_mdl, to_float(row['dp_truck']),
                                                stage_name='Transport, Displaced')
                 else:
                     print('No truck transport model specified/found; skipping displaced truck transport')
 
             if row.get('dp_ocean'):
                 if ocean_mdl:
-                    self._check_transport_link(disp, ocean_mdl, float(row['dp_ocean']),
+                    self._check_transport_link(disp, ocean_mdl, to_float(row['dp_ocean']),
                                                stage_name='Transport, Displaced')
                 else:
                     print('No ocean transport model specified/found; skipping displaced ocean transport')

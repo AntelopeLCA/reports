@@ -23,6 +23,7 @@ special semantics:
 If "child_flow" is "*" and the "descend" specification is not None, then the specification is applied to all child flows
 
 """
+from .float_conv import to_float
 
 
 def _cutoff(anc):
@@ -40,8 +41,9 @@ def _descend(desc):
             return False
         elif desc.lower() in ('true', '1'):
             return True
-    else:
-        return bool(desc)
+        elif desc.lower() == 'none':
+            return None
+    return bool(desc)
 
 
 class ObservationsFromSpreadsheet(object):
@@ -114,8 +116,9 @@ class ObservationsFromSpreadsheet(object):
         ev = row.get('parameter')
         units = row.get('units')
         if ev is not None:
+            ev = to_float(ev)
             for o in obj:
-                self.fg.observe(o, scenario=sc, exchange_value=float(ev), units=units)
+                self.fg.observe(o, scenario=sc, exchange_value=ev, units=units)
                 mesg = 'observing %g' % ev
                 if units is not None:
                     mesg += ' %s' % units
@@ -125,7 +128,7 @@ class ObservationsFromSpreadsheet(object):
         for i in range(1, self.sheet.nrows):
             ssr = i + 1
             row = self.sheet.row_dict(i)
-            if row['activity'] is None:
+            if row.get('activity') is None:
                 self._errmesg(ssr, 'Skipping blank row')
                 continue
             act = self.fg[row['activity']]

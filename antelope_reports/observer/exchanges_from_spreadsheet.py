@@ -5,8 +5,7 @@ This module provides a routine that generates a list of exchange refs from a pro
 from antelope import check_direction, CatalogRef, ExchangeRef
 from antelope.interfaces import InvalidDirection
 
-import locale
-
+from .float_conv import to_float
 
 class ValueIsBalance(Exception):
     """
@@ -68,15 +67,7 @@ def _exchange_params(origin, rowdict):
     if str(val).lower() == 'balance':
         value = ValueIsBalance
     else:
-        try:
-            value = float(val)
-        except ValueError:
-            try:
-                value = locale.atof(val)
-            except ValueError:
-                value = 0.0
-        except TypeError:
-            value = 0.0
+        value = to_float(val)
     unit = _popanykey(rowdict, 'unit', 'units')
     term = _popanykey(rowdict, 'context', 'compartment', 'target',
                       'defaultprovider', 'activitylinkid', 'term', 'termination')

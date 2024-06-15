@@ -61,8 +61,8 @@ class ModelMaker(QuickAndEasy):
     direction	-- direction of the child flow w.r.t. the parent node
     amount	-- observed exchange value of the reference flow
     balance_yn	-- boolean (could begin to accept 'balance' as a direction spec instead)
-    amount_hi	-- observed exchange value for high sensitivity case (not yet implemented)
-    amount_lo	-- observed exchange value for high sensitivity case (not yet implemented)
+    amount_hi	-- observed exchange value for high sensitivity case
+    amount_lo	-- observed exchange value for high sensitivity case
     units	-- unit of measure for amount, amount_hi, amount_lo
     child_flow  -- external ref of child flow (if blank, will be taken from anchor)
     stage_name	-- fragment 'StageName' property
@@ -118,8 +118,11 @@ class ModelMaker(QuickAndEasy):
     dp_ocean	-- ocean transport for massive dp flows, using truck transport target specified by trans_ocean
 
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, sens_lo='sens_lo', sens_hi='sens_hi', **kwargs):
         super(ModelMaker, self).__init__(*args, **kwargs)
+
+        self.sens_lo = sens_lo
+        self.sens_hi = sens_hi
 
         self._skips = []
         self._errors = dict()
@@ -181,6 +184,8 @@ class ModelMaker(QuickAndEasy):
             the_name = row.get(name, ext_ref)
             if ext_ref is None:
                 continue
+            if the_name is None:
+                the_name = ext_ref
             if ref_quantity is None:
                 ref_q = self._unit_map.get(row.get(ref_unit), 'Items')
             else:
@@ -305,7 +310,7 @@ class ModelMaker(QuickAndEasy):
                 print('Warning, fragment already named %s' % frag.external_ref)
         return frag
 
-    def _find_term_info(self, row):
+    def _find_reference_exchange(self, row):
         # first, find termination
         org = row.get('target_origin') or row.get('origin')
         if org:
@@ -358,7 +363,7 @@ class ModelMaker(QuickAndEasy):
         :return:
         """
 
-        rx = self._find_term_info(row)
+        rx = self._find_reference_exchange(row)
 
         if row.get('child_flow'):
             child_flow = self.fg.get_local(row.get('child_flow'))
@@ -410,6 +415,12 @@ class ModelMaker(QuickAndEasy):
                 self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
             except ConversionError:
                 raise BadExchangeValue(c.flow.reference_entity, row['units'])
+            if row.get('amount_lo', None) is not None:
+                ev_lo = to_float(row['amount_lo'])
+                self.fg.observe(c, exchange_value=ev_lo, units=row['units'], scenario=self.sens_lo)
+            if row.get('amount_lo', None) is not None:
+                ev_hi = to_float(row['amount_hi'])
+                self.fg.observe(c, exchange_value=ev_hi, units=row['units'], scenario=self.sens_hi)
         if row.get('stage_name'):
             c['StageName'] = row['stage_name']
             descend = False
@@ -421,6 +432,11 @@ class ModelMaker(QuickAndEasy):
             c['note'] = row['note']
         if row.get('Comment'):
             c['Comment'] = row['Comment']
+
+        if row.get('add_taps'):
+            for flow, _tap in self._taps.items():
+                direction, term = _tap
+                self.add_tap(c, flow, direction=direction, term=term, include_zero=False)
         return c
 
     def _log_e(self, ssr, e):
@@ -536,7 +552,6 @@ class ModelMaker(QuickAndEasy):
         """
         if self.xlsx is None:
             raise AttributeError('Please attach Google Sheet')
-        self._errors = dict()  # reset errors
 
         sheet = self.xlsx[sheetname]
         row = sheet.row_dict(ssr - 1)
@@ -550,6 +565,9 @@ class ModelMaker(QuickAndEasy):
         # build child
         c = self._build_production_row(parent, row)
         print('== %03d ==: %s' % (ssr, c))
+        if ssr in self._errors:
+            print('removing error for row %d' % ssr)
+            self._errors.pop(ssr)
 
     def _check_alpha_beta_prod(self, node, row_dict):
         """

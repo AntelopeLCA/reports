@@ -4,7 +4,7 @@ from antelope_core.contexts import NullContext
 from antelope import ConversionError
 from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
 
-from antelope_reports.observer.observations_from_spreadsheet import ObservationsFromSpreadsheet
+from antelope_reports.observer.observations_from_spreadsheet import ObservationsFromSpreadsheet, OBSERVATIONS_HEADER
 
 from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
@@ -116,13 +116,16 @@ class QuickAndEasy(object):
         for u in quantity['unitconversion'].keys():
             self._unit_map[u] = quantity.external_ref
 
-    def __init__(self, fg, terms=None, xlsx=None, quiet=True):
+    def __init__(self, fg, terms=None, xlsx=None, quiet=True, taps=None):
         """
         A quick-and-easy model builder.  Pass in a foreground to work with, a dictionary of terms mapping nickname to
         origin + external ref, and an optional XlrdLike spreadsheet
         :param fg:
-        :param terms:
+        :param terms: (k, (v,...)). Creates a map of keyname k to CatalogRef(*v). Used to terminate inventory flows.
         :param xlsx:
+        :param quiet: passed to fg archive builder
+        :param taps: name of spreadsheet containing flow taps (flow origin + ref tapped to target origin + ref)
+        :param
         """
         self._fg = fg
         self._terms = {}
@@ -131,9 +134,13 @@ class QuickAndEasy(object):
         self.set_terms(terms)
         self._unit_map = dict()
         self._populate_unit_map()
+        self._taps = {}
 
         if xlsx:
             self.xlsx = xlsx
+
+        if taps:
+            self.load_taps(taps)
 
     @property
     def xlsx(self):
@@ -174,6 +181,16 @@ class QuickAndEasy(object):
     def terms(self, term):
         return self._terms[term]
 
+    def get_flow_by_name_or_ref(self, origin, flow_name_or_ref, strict=True):
+        query = self.fg.cascade(origin)
+        try:
+            flow = query.get(flow_name_or_ref)
+        except EntityNotFound:
+            flows = filter(lambda x: not self.fg.get_context(x.context).elementary,
+                           query.flows(Name='^%s$' % flow_name_or_ref))
+            flow = self._get_one(flows, strict=strict)
+        return flow
+
     def find_background_rx(self, origin, external_ref=None, process_name=None, flow_name_or_ref=None, strict=True,
                            **kwargs):
         """
@@ -204,12 +221,7 @@ class QuickAndEasy(object):
                 except EntityNotFound:
                     term = self._get_one(query.processes(Name='^%s' % process_name, **kwargs), strict=strict)
             elif flow_name_or_ref:
-                try:
-                    flow = query.get(flow_name_or_ref)
-                except EntityNotFound:
-                    flows = filter(lambda x: not self.fg.context(x.context).elementary,
-                                   query.flows(Name='^%s$' % flow_name_or_ref))
-                    flow = self._get_one(flows, strict=strict)
+                flow = self.get_flow_by_name_or_ref(origin, flow_name_or_ref, strict=strict)
 
                 if hasattr(query, 'fragments_with_flow'):
                     term = self._get_one(query.fragments_with_flow(flow, reference=True))
@@ -344,7 +356,7 @@ class QuickAndEasy(object):
 
         :param parent:
         :param child_flow:
-        :param direction:
+        :param direction: ['Input'] exchange direction w/r/t parent
         :param scenario:
         :param term: what to terminate the child flow to. None = cutoff. True = to foreground. all others = term node
         :param term_flow:
@@ -371,6 +383,24 @@ class QuickAndEasy(object):
                 c.terminate(term, term_flow=term_flow, scenario=scenario)
 
         return c
+
+    def load_taps(self, sheetname='taps'):
+        sheet = self.xlsx[sheetname]
+        for r in range(1, sheet.nrows):
+            row = sheet.row_dict(r)
+            try:
+                flow = self.get_flow_by_name_or_ref(row['flow_origin'], row['flow_name_or_ref'], strict=True)
+            except (KeyError, AmbiguousResult) as e:
+                print('Loading tap from row %d: %s (%s) - skipping' % (r+1, e.__class__.__name__, e.args[0]))
+                continue
+            tgt_origin = row.get('target_origin', 'here')
+            if tgt_origin == 'here':
+                tgt = self.fg.get(row['target_ref'])
+            else:
+                tgt = self.fg.cascade(tgt_origin).get(row['target_ref'])
+            direction = row.get('direction', 'Input')
+
+            self._taps[flow] = direction, tgt
 
     def load_process_model(self, sheetname, prefix=None):
         """
@@ -403,6 +433,3 @@ class QuickAndEasy(object):
         scs = self.xlsx[sheetname]
         with ObservationsFromSpreadsheet(self.fg, scs) as obs:
             obs.apply()
-
-
-

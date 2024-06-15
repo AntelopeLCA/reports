@@ -26,6 +26,10 @@ If "child_flow" is "*" and the "descend" specification is not None, then the spe
 from .float_conv import to_float
 
 
+OBSERVATIONS_HEADER = ('activity', 'child_flow', 'scenario', 'parameter', 'units',
+                       'anchor_origin', 'anchor', 'anchor_flow', 'descend')
+
+
 def _cutoff(anc):
     if isinstance(anc, str):
         if anc.lower() == 'cutoff':
@@ -147,7 +151,10 @@ class ObservationsFromSpreadsheet(object):
                     if cf is None:
                         self._errmesg(ssr, 'Child flow %s not found' % row['child_flow'])
                         continue
-                    obj = list(act.children_with_flow(cf))
+                    if cf.entity_type == 'flow':
+                        obj = list(act.children_with_flow(cf, recurse=True))
+                    else:
+                        obj = [cf]
             else:
                 obj = [act]
             self._handle_anchor(ssr, obj, row)

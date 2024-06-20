@@ -26,7 +26,10 @@ class ModelGraph(object):
                      'Input': 'larrow'}[check_direction(frag.direction)]
             if bool(self._values):
                 ev = frag.exchange_value(self._scenario or True)
-                m = log10(ev)
+                if ev == 0:
+                    m = 2  # we just want a '0.0'
+                else:
+                    m = log10(abs(ev))
                 if abs(m) <= 3:
                     if m > 1:
                         label = '%.1f %s' % (ev, frag.flow.unit)

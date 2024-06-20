@@ -6,7 +6,8 @@ from collections import defaultdict
 
 class SensitivityRunner(ScenarioRunner):
     @classmethod
-    def run_lca(cls, model, qs, *common, agg_key=None, hi_sense=None, lo_sense=None, **scenarios):
+    def run_lca(cls, model, qs, *common, agg_key=None, sens_hi=None, sens_lo=None,
+                hi_sense=None, lo_sense=None, **scenarios):
         """
         "Do everything" classmethod for running an LCA study based on a unitary model.
         Prior to calling this: all scenarios must be properly prepared (parameters and terminations observed)
@@ -16,8 +17,8 @@ class SensitivityRunner(ScenarioRunner):
 
         Optional positional parameters are common scenarios to be added to all cases
 
-        hi_sense and lo_sense are optional tuples of scenario specifications for high- and low-sensitivity test
-        cases, respectively.  These will not get run if they are omitted.
+        sens_hi and sens_lo (synonyms: hi_sense and lo_sense) are optional tuples of scenario specifications for
+        high- and low-sensitivity test cases, respectively.  These will not get run if they are omitted.
 
         Finally, the scenarios themselves are supplied as kwarg: tuple. At least one must be supplied, even if it
         has None value, because otherwise the runner won't know what to name the default scenario.
@@ -25,12 +26,14 @@ class SensitivityRunner(ScenarioRunner):
         :param qs:
         :param common:
         :param agg_key:
-        :param hi_sense:
-        :param lo_sense:
+        :param sens_hi:
+        :param sens_lo:
+        :param hi_sense: synonym for sens_hi
+        :param lo_sense: synonym for sens_lo
         :param scenarios:
         :return:
         """
-        run = cls(model, *common, agg_key=agg_key, sens_hi=hi_sense, sens_lo=lo_sense)
+        run = cls(model, *common, agg_key=agg_key, sens_hi=sens_hi or hi_sense, sens_lo=sens_lo or lo_sense)
         for k, v in scenarios.items():
             run.add_case(k, v)
 

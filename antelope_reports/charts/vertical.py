@@ -18,7 +18,8 @@ def spread_bars(ax, data, color_gen, hi=None, lo=None, y_lim=None, barwidth=0.65
     :param labels: [True] whether to label the top of each bar
     :return:
     """
-    x = [i - barwidth/2 + x_offset for i in range(len(data))]
+    # x = [i - barwidth/2 + x_offset for i in range(len(data))]
+    x = [i + x_offset for i in range(len(data))]
 
     kwargs['ecolor'] = (0, 0, 0)
     kwargs['width'] = barwidth
@@ -123,6 +124,8 @@ def spread_contrib_figure(results, stages, colors=None, scenarios=None, results_
                 y_hi = y1
         for x in ax:
             x.set_ylim(y_lo, y_hi)
+
+    return f
 
 
 def spread_scenario_compare(ax, results, stages, colors=None, scenarios=None, results_hi=None, results_lo=None,

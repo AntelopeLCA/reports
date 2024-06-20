@@ -66,9 +66,10 @@ class ModelMaker(QuickAndEasy):
     units	-- unit of measure for amount, amount_hi, amount_lo
     child_flow  -- external ref of child flow (if blank, will be taken from anchor)
     stage_name	-- fragment 'StageName' property
-    scenario	-- support for alternative exchange value + anchor scenario specifications (not yet implemented)
     note	-- fragment 'note' property
     Comment	-- fragment 'Comment' property
+
+    scenario	-- deprecated
 
     anchor spec:
     (these are used in _find_term_info(), ultimately passed to find_background_rx()
@@ -156,6 +157,9 @@ class ModelMaker(QuickAndEasy):
         :param kwargs:
         :return:
         """
+        if not self._quiet:
+            print('\n autodetecting %s' % sheetname)
+
         sheet = self.xlsx[sheetname]
 
         if external_ref is None:
@@ -412,7 +416,7 @@ class ModelMaker(QuickAndEasy):
             except (TypeError, ValueError):
                 raise BadExchangeValue(row.get('amount'))
             try:
-                self.fg.observe(c, exchange_value=ev, units=row['units'], scenario=row.get('scenario'))
+                self.fg.observe(c, exchange_value=ev, units=row['units'])
             except ConversionError:
                 raise BadExchangeValue(c.flow.reference_entity, row['units'])
             if row.get('amount_lo', None) is not None:
@@ -426,7 +430,7 @@ class ModelMaker(QuickAndEasy):
             descend = False
         else:
             descend = True
-        c.terminate(rx, scenario=row.get('scenario'), descend=descend)
+        c.terminate(rx, descend=descend)
 
         if row.get('note'):
             c['note'] = row['note']

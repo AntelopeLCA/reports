@@ -2,9 +2,9 @@ from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope_core.contexts import NullContext
 from antelope import ConversionError
-from antelope import EntityNotFound, enum, comp_dir, MultipleReferences
+from antelope import EntityNotFound, enum, MultipleReferences
 
-from antelope_reports.observer.observations_from_spreadsheet import ObservationsFromSpreadsheet, OBSERVATIONS_HEADER
+from .observations_from_spreadsheet import ObservationsFromSpreadsheet
 
 from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
@@ -247,6 +247,7 @@ class QuickAndEasy(object):
 
         return frag
 
+    # this is from a misbegotten demo
     def new_link(self, flow_name, ref_quantity, direction, amount=None, units=None, flow_ref=None, parent=None, name=None,
                  stage=None,
                  prefix='frag',

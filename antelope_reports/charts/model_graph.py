@@ -133,3 +133,6 @@ class ModelGraph(object):
 
     def write_png(self, filename):
         self._graph.write_png(filename)
+
+    def write_svg(self, filename):
+        self._graph.write_svg(filename)

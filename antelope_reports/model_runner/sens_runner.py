@@ -106,15 +106,18 @@ class SensitivityRunner(ScenarioRunner):
 
         if self._sens_hi:
             sc_hi = sc_apply + self._sens_hi
-            self._results_hi[scenario, lcia] = frag_flow_lcia(self._traversals_hi[scenario], lcia, scenario=sc_hi, **kwargs)
+            res_hi = frag_flow_lcia(self._traversals_hi[scenario], lcia, scenario=sc_hi, **kwargs)
         else:
-            self._results_hi[scenario, lcia] = res
+            res_hi = res
 
         if self._sens_lo:
             sc_lo = sc_apply + self._sens_lo
-            self._results_lo[scenario, lcia] = frag_flow_lcia(self._traversals_lo[scenario], lcia, scenario=sc_lo, **kwargs)
+            res_lo = frag_flow_lcia(self._traversals_lo[scenario], lcia, scenario=sc_lo, **kwargs)
         else:
-            self._results_lo[scenario, lcia] = res
+            res_lo = res
+
+        self._results_lo[scenario, lcia] = min([res, res_lo, res_hi], key=lambda x: x.total())
+        self._results_hi[scenario, lcia] = max([res, res_lo, res_hi], key=lambda x: x.total())
 
         return res
 

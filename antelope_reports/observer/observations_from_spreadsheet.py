@@ -93,6 +93,8 @@ class ObservationsFromSpreadsheet(object):
                     return
             for o in obj:
                 o.clear_termination(scenario=sc)
+                if desc is None:
+                    desc = o.term.descend
                 self.fg.observe(o, scenario=sc, anchor=anchor, anchor_flow=a_f, descend=desc)
                 mesg = 'anchor to %s' % anc
                 if a_f:

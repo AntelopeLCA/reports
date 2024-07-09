@@ -3,22 +3,23 @@ from .lca_model_runner import LcaModelRunner
 
 from antelope_foreground.fragment_flows import group_ios, ios_exchanges, frag_flow_lcia
 
+from functools import reduce
+
 
 class ScenarioRunner(ComponentsMixin, LcaModelRunner):
     """
     This runs a single model (fragment), applying a set of different scenario specifications. 
     """
-    @staticmethod
-    def _scenario_tuple(arg):
+    def _scenario_tuple(self, arg):
         """
-        Translates None, strings, or tuples into tuples
+        Translates None, strings, or tuples into tuples. should return a flat (non-nested) tuple
         check out all the work being done by that one comma
         :param arg:
         :return:
         """
         if arg:
             if isinstance(arg, tuple):
-                return arg
+                return tuple(reduce(lambda a, b: a+b, (self._scenario_tuple(k) for k in arg)))
             else:
                 return arg,
         return ()

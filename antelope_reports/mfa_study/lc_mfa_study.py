@@ -61,19 +61,39 @@ class NestedLcaStudy(object):
             fu = self._fg.add_or_retrieve(external_ref, self._act, name, strict=True, **kwargs)
         return fu
 
+    @classmethod
+    def create_from_names(cls, cat, fg_name, models_name, data_name=None, **kwargs):
+        """
+        In the event that the models + data foregrounds already exist, this is a convenience function to
+        encapsulate the foreground query calls.
+        :param cat:
+        :param fg_name:
+        :param models_name:
+        :param data_name:
+        :param kwargs:
+        :return:
+        """
+        fg = cat.foreground(fg_name, create=True, reset=True)
+        models = cat.foreground(models_name)
+        if data_name:
+            data = cat.foreground(data_name)
+        else:
+            data = None
+        return cls(fg, models=models, data=data, **kwargs)
+
     def __init__(self, foreground, models=None, data=None, reference_flow='LCA Study',
-                 study_container='Study Container',
-                 logistics_container='Logistics Container',
-                 activity_container='Activity Container'):
+                 study_container='study_container',
+                 logistics_container='logistics_container',
+                 activity_container='activity_container'):
         """
 
-        :param foreground: to contain the study model
-        :param models: [optional] to contain upstream models
-        :param data:
-        :param reference_flow:
-        :param study_container:
-        :param logistics_container:
-        :param activity_container:
+        :param foreground: foreground query - to contain the study model - ephemeral
+        :param models: [optional] foreground query to contain upstream models
+        :param data: foreground query for MFA data
+        :param reference_flow: flow name for the study's reference flow
+        :param study_container: [eponymous] external_ref
+        :param logistics_container: [eponymous] external_ref
+        :param activity_container: [eponymous] external_ref
         """
         self._fg = foreground
         if models is None:
@@ -134,7 +154,7 @@ class NestedLcaStudy(object):
         try:
             return self._fg.get(self._logis)
         except EntityNotFound:
-            study = self._fg.new_fragment(self.reference_flow, 'Output', name='%s - Logistics' % self._ref)
+            study = self._fg.new_fragment(self.reference_flow, 'Output', name='%s_logistics' % self._ref)
             self._fg.observe(study, name=self._logis, termination=self.activity_container)
         return self._fg.get(self._logis)
 
@@ -143,7 +163,7 @@ class NestedLcaStudy(object):
         try:
             return self._fg.get(self._activ)
         except EntityNotFound:
-            study = self._fg.new_fragment(self.reference_flow, 'Output', name='%s - Nodes' % self._ref)
+            study = self._fg.new_fragment(self.reference_flow, 'Output', name='%s_nodes' % self._ref)
             self._fg.observe(study, name=self._activ)
         return self._fg.get(self._activ)
 
@@ -376,6 +396,7 @@ class NestedLcaStudy(object):
         :param parent_or_flow: either a parent fragment whose flow is getting mixed, or a flow to build a self-standing mixer
         :param p_map:
         :param sense:
+        :param stage_names:
         :return:
         """
         if self.route_debug:
@@ -445,10 +466,10 @@ class NestedLcaStudy(object):
     '''
     Model populating methods
     '''
-    def make_routes(self, routes, stage_names=None):
+    def make_routes(self, routes, sense='Sink', stage_names=None):
         for k, v in routes.items():
             try:
-                self.make_route(k, v, sense='Sink', stage_names=stage_names)
+                self.make_route(k, v, sense=sense, stage_names=stage_names)
             except DuplicateRoute:
                 print('Route %s exists; NOT updating' % k)
                 pass

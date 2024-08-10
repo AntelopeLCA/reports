@@ -11,7 +11,8 @@ class StudySpec(BaseModel):
     stage_names: Dict[str, str]  # target: stagename
     logistics_mappings: Dict[str, Tuple[str, str]]  # flow: target, stagename
     activity_mappings: Dict[Tuple[str, str], Tuple[str, str]]  # direction, flow: target, stagename
-    routes: Dict[str, Tuple]  # name: tuple-spec
+    supply_routes: Dict[str, Tuple]  # name: tuple-spec, sense='Source'
+    disposition_routes: Dict[str, Tuple]  # name: tuple-spec, sense='Sink'
     study_sinks: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
     study_sources: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
 
@@ -63,8 +64,16 @@ class ObservedMfaStudy(DynamicUnitLcaStudy):
             self._make_study_market(k, 'Sink', v, stage_names)
 
     def make_study(self, study_spec: StudySpec):
-        self.make_routes(study_spec.routes, stage_names=study_spec.stage_names)
+        # study building blocks
+        self.make_routes(study_spec.supply_routes, sense='Source', stage_names=study_spec.stage_names)
+        self.make_routes(study_spec.disposition_routes, sense='Sink', stage_names=study_spec.stage_names)
+
+        # transformation activities
         self.make_activity_mappings(study_spec.activity_mappings)
+
+        # logistics activities
         self.make_logistics_mappings(study_spec.logistics_mappings)
+
+        # terminations for study inflows and outflows
         self.make_study_sources(study_spec.study_sources, stage_names=study_spec.stage_names)
         self.make_study_sinks(study_spec.study_sinks, stage_names=study_spec.stage_names)

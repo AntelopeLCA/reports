@@ -142,11 +142,13 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
         parent = self._fg.get('unit-dynamic_supplies')
         return self._add_unit_knob(knob, supply, direction, parent, descend, term_map)
 
+    '''
     def add_logistics_route(self, flow, provider, descend=False, term_map=None, **kwargs):
         c = super(DynamicUnitLcaStudy, self).add_logistics_route(flow, provider, descend=descend, **kwargs)
         knob = c.flow.name
         knob = knob.replace('/', '_')
         return self._add_unit_knob(knob, c.flow, 'Input', self.unit_logistics, descend, term_map=term_map)
+    '''
 
     def _add_unit_knob(self, knob, entry, direction, parent, descend=None, term_map=None):
         """

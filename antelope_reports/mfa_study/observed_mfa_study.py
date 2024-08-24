@@ -1,6 +1,5 @@
 from .dynamic_unit_study import DynamicUnitLcaStudy
-from .lc_mfa_study import DuplicateRoute
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, Optional
 from pydantic import BaseModel
 
 from antelope import comp_dir, EntityNotFound
@@ -8,13 +7,13 @@ from antelope import comp_dir, EntityNotFound
 
 class StudySpec(BaseModel):
 
-    stage_names: Dict[str, str]  # target: stagename
-    logistics_mappings: Dict[str, Tuple[str, str]]  # flow: target, stagename
-    activity_mappings: Dict[Tuple[str, str], Tuple[str, str]]  # direction, flow: target, stagename
-    supply_routes: Dict[str, Tuple]  # name: tuple-spec, sense='Source'
-    disposition_routes: Dict[str, Tuple]  # name: tuple-spec, sense='Sink'
-    study_sinks: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
-    study_sources: Dict[str, Dict[str, Optional[float]]]  # flow: {target: share}
+    stage_names: Dict[str, str] = dict()  # target: stagename
+    logistics_mappings: Dict[str, Tuple[str, str]] = dict()  # flow: target, stagename
+    activity_mappings: Dict[Tuple[str, str], Tuple[str, str]] = dict()  # direction, flow: target, stagename
+    supply_routes: Dict[str, Tuple] = dict()  # name: tuple-spec, sense='Source'
+    disposition_routes: Dict[str, Tuple] = dict()  # name: tuple-spec, sense='Sink'
+    study_sinks: Dict[str, Dict[str, Optional[float]]] = dict()  # flow: {target: share}
+    study_sources: Dict[str, Dict[str, Optional[float]]] = dict()  # flow: {target: share}
 
 
 class ObservedMfaStudy(DynamicUnitLcaStudy):
@@ -31,11 +30,27 @@ class ObservedMfaStudy(DynamicUnitLcaStudy):
         cf.clear_termination(scenario=scenario)
         cf.terminate(term, scenario=scenario, descend=False)
         cf['StageName'] = stage
+        return cf
+
+    '''
+    def add_logistics_route(self, flow, provider, descend=False, **kwargs):
+        try:
+            return next(self.logistics_container.children_with_flow(flow))
+        except StopIteration:
+            c = self.fg.new_fragment(flow, 'Input', parent=self.logistics_container, **kwargs)
+            c.terminate(self._resolve_term(provider), descend=descend)
+            return c
+    '''
 
     def make_logistics_mappings(self, logistics_mappings):
         for k, v in logistics_mappings.items():
             t, stage = v
-            self._make_study_mapping(self.logistics_container, k, 'Input', t, stage=stage)
+            cf = self._make_study_mapping(self.logistics_container, k, 'Input', t, stage=stage)
+            # also add a logistics knob to the unit logistics model-- we could do this in general....
+            knob = cf.flow.name
+            knob = knob.translate(str.maketrans('/ ()', '--__'))
+            print('doing unit logs %s' % knob)
+            self._add_unit_knob(knob, cf.flow, 'Input', self.unit_logistics, descend=False)
 
     def make_activity_mappings(self, activity_mappings):
         for k, v in activity_mappings.items():

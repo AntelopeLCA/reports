@@ -1,3 +1,4 @@
+from .lca_study import LcaStudy, DuplicateRoute
 from .model_updater import XlsxForegroundUpdater
 from .scenario_updater import XlsxScenarioUpdater
 from .ecoinvent_grids import EcoinventGrids, LEVELS

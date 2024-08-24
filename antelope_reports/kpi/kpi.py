@@ -3,6 +3,8 @@ from textwrap import wrap
 import operator
 
 from matplotlib import pyplot as plt
+from matplotlib.container import BarContainer
+from matplotlib.patches import Rectangle
 
 USE_TEX = False
 
@@ -67,7 +69,8 @@ class KPIBase(object):
     |-----------------------------------|              chart             |
     |  YEAR                NUMBER  unit |                                |
     |                                   |                                |
-    |                                   |                                |
+    |___________________________________|                                |
+    |comment                            |                                |
     +--------------------------------------------------------------------+
 
 
@@ -101,52 +104,68 @@ class KPIBase(object):
         if fontsize is None:
             fontsize = self.fontsize
 
-        self.content_row -= (fontsize * 1.15 / self.font_hgt)
+        self.content_row -= (fontsize * 1.15 / self.font_hgt)  # normalized units
 
         text_at = 0.015
 
         if draw_symbol:
-            pps = {'linewidth': self.the_plot.get_linewidth(),
-                   'linestyle': self.the_plot.get_linestyle(),
-                   'color': self.the_plot.get_color(),
-                   'marker': self.the_plot.get_marker(),
-                   'markersize': self.the_plot.get_markersize(),
-                   'markeredgecolor': self.the_plot.get_markeredgecolor(),
-                   'markerfacecolor': self.the_plot.get_markerfacecolor()
-                   }
-            mid = self.content_row + (fontsize * 0.4 / self.font_hgt)
-            ppy = (mid, mid)
-            if draw_symbol == 'value':
-                amt_s = fmt % amount
-                amt_wid = len(amt_s) / 72  # hardcodes 16 chars per inch x 6 inch width bc I'm dumb
-                ppx = (self.content_f[0] - amt_wid - 0.06, self.content_f[0] - amt_wid - 0.015)
-                self.ax.plot(ppx, ppy, **pps)
+            if isinstance(self.the_plot, BarContainer):
+                patch = self.the_plot.patches[0]
+                pps = {'linewidth': patch.get_linewidth(),
+                       'edgecolor': patch.get_edgecolor(),
+                       'facecolor': patch.get_facecolor()}
+                text_at += 0.04
+                mid = self.content_row + (fontsize * 0.1 / self.font_hgt)
+                h = (fontsize * 0.7 / self.font_hgt)
+                p = Rectangle((0.015, mid-0.02), 0.035, h, **pps)
+                self.frame.add_patch(p)
             else:
-                text_at += 0.06
-                self.ax.plot((0.015, 0.06), ppy, **pps)
+                pps = {'linewidth': self.the_plot.get_linewidth(),
+                       'linestyle': self.the_plot.get_linestyle(),
+                       'color': self.the_plot.get_color(),
+                       'marker': self.the_plot.get_marker(),
+                       'markersize': self.the_plot.get_markersize(),
+                       'markeredgecolor': self.the_plot.get_markeredgecolor(),
+                       'markerfacecolor': self.the_plot.get_markerfacecolor()
+                       }
+                mid = self.content_row + (fontsize * 0.4 / self.font_hgt)
+                ppy = (mid, mid)
+                if draw_symbol == 'value':
+                    amt_s = fmt % amount
+                    amt_wid = len(amt_s) / 72  # hardcodes 16 chars per inch x 6 inch width bc I'm dumb/lazy
+                    ppx = (self.content_f[0] - amt_wid - 0.06, self.content_f[0] - amt_wid - 0.015)
+                    self.frame.plot(ppx, ppy, **pps)
+                else:
+                    text_at += 0.06
+                    self.frame.plot((0.015, 0.06), ppy, **pps)
 
-        t0 = self.ax.text(text_at, self.content_row, '%s' % record, fontsize=fontsize,
-                          ha='left', va='baseline', **record_args)
-        t1 = self.ax.text(self.content_f[0], self.content_row, fmt % amount,
-                          ha='right', va='baseline', **amount_args)
+        t0 = self.frame.text(text_at, self.content_row, '%s' % record, fontsize=fontsize,
+                             ha='left', va='baseline', **record_args)
+        t1 = self.frame.text(self.content_f[0], self.content_row, fmt % amount,
+                             ha='right', va='baseline', **amount_args)
         if not unit:
             unit = '%s' % self.unit
         if unit == '%':
             unit = self.pct()
 
-        t2 = self.ax.text(self.content_f[1], self.content_row, unit,
-                          ha='left', va='baseline', **amount_args)
+        if unit == 'none':
+            t2 = None  # suppress unit
+        else:
+            t2 = self.frame.text(self.content_f[1], self.content_row, unit,
+                                 ha='left', va='baseline', **amount_args)
         self.metrics.append((t0, t1, t2))
 
-    def __init__(self, title, subtitle, unit, comment=None, figsize=(6.5, 1.8), graph_f=0.55, frame_lw=1.2, long=False,
-                 graph_l_m_in=0.36, graph_b_m_in=0.35,
+    def __init__(self, title, subtitle, unit, comment=None, figsize=(6.5, 1.8), text_f=0.55, frame_lw=1.2, long=False,
+                 graph_l_m_in=0.39, graph_b_m_in=0.39,
                  metrics=(0.85, 0.88),
-                 title_in=0.5, comment_in=0.45, fontsize=12):
+                 title_in=0.5, comment_in=0.55, fontsize=12):
 
+        # data elements
         self._xs = []
         self._ys = []
         self._the_plots = []
 
+        # display elements
         self._series = -1
         self._this = -1
         self.unit = unit  # data unit
@@ -156,7 +175,7 @@ class KPIBase(object):
         wid, hgt = figsize
         self.font_hgt = 72 * hgt  # figure height in font points
 
-        self.graph_f = graph_f
+        self.text_f = text_f
         self.title_f = 1.0 - title_in / hgt
         self.frame_lw = frame_lw
 
@@ -166,17 +185,17 @@ class KPIBase(object):
         if long:
             self.numchars = int(16 * wid)  # approx width of content in number of characters (at 10 pt)
         else:
-            self.numchars = int(16 * wid * graph_f)  # approx width of content in number of characters (at 10 pt)
+            self.numchars = int(16 * wid * text_f)  # approx width of content in number of characters (at 10 pt)
 
         self.content_row = self.title_f - 0.035
-        self.content_f = [graph_f * k for k in metrics]
+        self.content_f = [text_f * k for k in metrics]
 
         self.metrics = []
 
         self.f = f = plt.figure(figsize=figsize)
 
         # content axes
-        self.ax = f.add_axes((0, 0, 1, 1))
+        self.frame = f.add_axes((0, 0, 1, 1))
         plt.axis('tight')
 
         # chart axes
@@ -187,27 +206,27 @@ class KPIBase(object):
             graph_b = comment_f + graph_b_m
         else:
             graph_b = graph_b_m
-        self.ax2 = f.add_axes((graph_f + graph_l_m, graph_b,
-                               0.99 - graph_f - graph_l_m, 0.92 - graph_b))
+        self.chart = f.add_axes((text_f + graph_l_m, graph_b,
+                                 0.99 - text_f - graph_l_m, 0.92 - graph_b))
 
         # title
-        self.title = self.ax.text(0.015, self.title_pin + 0.015, title, fontsize=self.fontsize * 1.6,
-                                  ha='left', va='bottom')
-        self.subtitle = self.ax.text(0.015, self.title_pin, '%s (%s)' % (subtitle, self.unit), fontsize=self.fontsize,
-                                     ha='left', va='top')
+        self.title = self.frame.text(0.015, self.title_pin + 0.015, title, fontsize=self.fontsize * 1.6,
+                                     ha='left', va='bottom')
+        self.subtitle = self.frame.text(0.015, self.title_pin, '%s (%s)' % (subtitle, self.unit), fontsize=self.fontsize,
+                                        ha='left', va='top')
 
-        self.comment = self.ax.text(0.015, comment_f - 0.035, 'comment', ha='left', va='top',
-                                    fontsize=self.fontsize * 0.83,
-                                    visible=False)
+        self.comment = self.frame.text(0.015, comment_f - 0.035, 'comment', ha='left', va='top',
+                                       fontsize=self.fontsize * 0.83,
+                                       visible=False)
         if long:
-            self._comment_frame = self.ax.plot((0, 1), (comment_f, comment_f), color='k',
-                                               linewidth=self.frame_lw, visible=True)[0]
+            self._comment_frame = self.frame.plot((0, 1), (comment_f, comment_f), color='k',
+                                                  linewidth=self.frame_lw, visible=True)[0]
         else:
-            self._comment_frame = self.ax.plot((0, self.graph_f), (comment_f, comment_f), color='k',
-                                               linewidth=self.frame_lw * 0.7, visible=False)[0]
+            self._comment_frame = self.frame.plot((0, self.text_f), (comment_f, comment_f), color='k',
+                                                  linewidth=self.frame_lw * 0.7, visible=False)[0]
 
-        self._format_ax(long, comment_f)
-        self._format_ax2()
+        self._format_frame(long, comment_f)
+        self._format_chart()
         self.set_comment(comment)  # None will pass
 
     @property
@@ -238,100 +257,69 @@ class KPIBase(object):
     def this_y(self):
         return self.ys[self._this]
 
-    def _format_ax(self, long, comment_f):
-        self.ax.set_xlim([0, 1])
-        self.ax.set_ylim([0, 1])
-        self.ax.set_xticks(())
-        self.ax.set_yticks(())
+    def _format_frame(self, long, comment_f):
+        self.frame.set_xlim([0, 1])
+        self.frame.set_ylim([0, 1])
+        self.frame.set_xticks(())
+        self.frame.set_yticks(())
 
         # draw frames
-        self.ax.plot((0, self.graph_f), (self.title_f, self.title_f), color='k', linewidth=self.frame_lw)
+        self.frame.plot((0, self.text_f), (self.title_f, self.title_f), color='k', linewidth=self.frame_lw)
         if long:
-            self.ax.plot((self.graph_f, self.graph_f), (comment_f, 1), color='k', linewidth=self.frame_lw)
+            self.frame.plot((self.text_f, self.text_f), (comment_f, 1), color='k', linewidth=self.frame_lw)
         else:
-            self.ax.plot((self.graph_f, self.graph_f), (0, 1), color='k', linewidth=self.frame_lw)
+            self.frame.plot((self.text_f, self.text_f), (0, 1), color='k', linewidth=self.frame_lw)
 
-    def _format_ax2(self):
-        self.ax2.spines['right'].set_visible(False)
-        self.ax2.spines['left'].set_visible(False)
-        self.ax2.spines['top'].set_visible(False)
-        self.ax2.spines['bottom'].set_visible(False)
-        self.ax2.set_clip_on(False)
+    def _format_chart(self):
+        self.chart.spines['right'].set_visible(False)
+        self.chart.spines['left'].set_visible(False)
+        self.chart.spines['top'].set_visible(False)
+        self.chart.spines['bottom'].set_visible(False)
+        self.chart.set_clip_on(False)
 
         # what a terrible syntactic trick
-        self.baseline, = self.ax2.plot((0, 1), (0, 0), linestyle='-', color='k', linewidth=0.7, visible=False)
+        self.baseline, = self.chart.plot((0, 1), (0, 0), linestyle='-', color='k', linewidth=0.7, visible=False)
 
         # def _draw_frame(self):
 
-    def draw_plot(self, xs, ys, linestyle='-', marker='o', color=(0.5, 0.1, 0.1), this=-1,
-                  hi_color=(0.1, 0.1, 0.5), hi_size=10, a_fmt='%.1f', g_gap=0.38, jog=12, fill=None,
-                  **kwargs):
-        """
-        Add a dataset to the graphic. xs and ys will be set as the current data.  'this' indicates which value to
-        hilight (default -1, set to None to disable hilight)
-        :param xs:
-        :param ys:
-        :param linestyle:
-        :param marker:
-        :param color:
-        :param this:
-        :param hi_color:
-        :param hi_size:
-        :param a_fmt:
-        :param g_gap:
-        :param jog:
-        :param fill: if True, fill the space between the line and (x axis, or prior dataset). If int, fill the space
-         between the line and the indicated dataset
-        :param kwargs:
-        :return:
-        """
-        #####
-        self._this = this
-        self._xs.append(list(xs))
-        self._ys.append(list(ys))
-        # def draw_plot(self):
+    def rescale(self, g_gap):
+        self.chart.autoscale()  # rescale the axes to extents
 
-        if fill is not None:
-            if fill is True:
-                if self.N < 2:
-                    yb = 0
-                else:
-                    yb = self._ys[-2]
-            else:
-                try:
-                    fill = int(fill)
-                    yb = self._ys[fill]
-                except (TypeError, IndexError):
-                    yb = 0
-            self.ax2.fill_between(self.xs, self.ys, yb, color=color, alpha=0.3)
-
-        # line plot with markers
-        pl, = self.ax2.plot(self.xs, self.ys, linestyle=linestyle, marker=marker, color=color, clip_on=False, **kwargs)
-        self._the_plots.append(pl)
-
-        self.ax2.autoscale()  # rescale the axes to extents
-
-        xlim = self.ax2.get_xlim()
+        xlim = self.chart.get_xlim()
         xlim = [xlim[0] - g_gap, xlim[1] + g_gap]
-        self.ax2.set_xlim(xlim)
+        self.chart.set_xlim(xlim)
         self.baseline.set_xdata(xlim)
         self.baseline.set_visible(True)
         self.baseline.set_clip_on(False)
 
-        ylim = self.ax2.get_ylim()
+        ylim = self.chart.get_ylim()
         if ylim[1] < 0:
             ylim = [ylim[0], 0]
         elif ylim[0] > 0:
             ylim = [0, ylim[1]]
-        self.ax2.set_ylim(ylim)
-        # self.ax2.set_yticklabels(ylim)
+        self.chart.set_ylim(ylim)
+        # set ticklabel font sizes
+        self.chart.tick_params(axis='x', labelsize=self.fontsize * 0.83)
+        self.chart.tick_params(axis='y', labelsize=self.fontsize * 0.83)
 
-        if self._this is None:
-            self._this = -1  # reset to last value
-        else:
+    def highlight(self, this=-1, marker='o', hi_color=(0.1, 0.1, 0.5), hi_size=10, a_fmt='%.1f', jog=12):
+        """
+
+        :param this: [-1] index of plot point to highlight
+        :param marker:
+        :param hi_color: color of highlight marker
+        :param hi_size: size of highlight marker
+        :param a_fmt: ['%.1f'] printf format for highlight annotation
+        :param jog: [12] vertical position control for annotation (pts)
+        :return:
+        """
+        self._this = this
+        if self._this is not None:
             # highlight 'this' value
-            self.ax2.plot(self.this_x, self.this_y, linestyle='none', marker=marker, markerfacecolor='none',
-                          markeredgecolor=hi_color, markersize=hi_size, clip_on=False)
+            self.chart.plot(self.this_x, self.this_y, linestyle='none', marker=marker, markerfacecolor='none',
+                            markeredgecolor=hi_color, markersize=hi_size, clip_on=False)
+
+            ylim = self.chart.get_ylim()
 
             # annotate 'this' value
             # put below if value is too high
@@ -339,13 +327,65 @@ class KPIBase(object):
                 jog *= -1.3
 
             # omit unit, since it's printed in the frame
-            self.ax2.annotate(a_fmt % self.this_y, xy=(self.this_x, self.this_y),
-                              xytext=(0, jog), textcoords='offset points',
-                              ha='center')
+            self.chart.annotate(a_fmt % self.this_y, xy=(self.this_x, self.this_y),
+                                xytext=(0, jog), textcoords='offset points',
+                                ha='center')
 
-        # set ticklabel font sizes
-        self.ax2.tick_params(axis='x', labelsize=self.fontsize * 0.83)
-        self.ax2.tick_params(axis='y', labelsize=self.fontsize * 0.83)
+    def draw_plot(self, xs, ys, linestyle='-', marker='o', color=(0.5, 0.1, 0.1), g_gap=0.38, fill=None,
+                  **kwargs):
+        """
+        Add a dataset to the graphic as a line plot. xs and ys will be set as the current data.
+        'this' indicates which value to hilight (default -1, set to None to disable hilight)
+        :param xs: x coordinates
+        :param ys: y coordinates
+        :param linestyle: data linestyle
+        :param marker: data marker
+        :param color: data line color
+        :param g_gap: [0.38] padding to add to the left and right of the x axis
+        :param fill: if True, fill the space between the line and (x axis, or prior dataset). If int, fill the space
+         between the line and the indicated dataset
+        :param kwargs:
+        :return:
+        """
+        #####
+        self._xs.append(list(xs))
+        self._ys.append(list(ys))
+        # def draw_plot(self):
+
+        if fill is not None:
+            if fill is True:
+                yb = 0
+            else:
+                try:
+                    fill = int(fill)
+                    yb = self._ys[fill]
+                except (TypeError, IndexError):
+                    yb = 0
+            self.chart.fill_between(self.xs, self.ys, yb, color=color, alpha=0.3)
+
+        # line plot with markers
+        pl, = self.chart.plot(self.xs, self.ys, linestyle=linestyle, marker=marker, color=color, clip_on=False, **kwargs)
+        self._the_plots.append(pl)
+
+        self.rescale(g_gap)
+
+    def draw_barplot(self, xs, ys, color=(0.121, 0.467, 0.706), g_gap=0.38, **kwargs):
+        """
+
+        :param xs:
+        :param ys:
+        :param color:
+        :param g_gap:
+        :param kwargs:
+        :return:
+        """
+        self._xs.append(list(xs))
+        self._ys.append(list(ys))
+
+        bar = self.chart.bar(self.xs, self.ys, color=color, **kwargs)
+        self._the_plots.append(bar)
+
+        self.rescale(g_gap)
 
     def set_comment(self, comment):
         if comment:
@@ -416,27 +456,29 @@ class KPIBase(object):
             ch = (self.this_y - prior_y) / prior_y
             self._write_metric(metric, ch, '', fmt='%+.3f', **kwargs)
 
+    def _label_metric(self, default):
+        lbl = self.the_plot.get_label()
+        if lbl.startswith('_'):  # not set by user
+            return default
+        return '%s, %s' % (default, lbl)
+
     def report_total(self, metric=None, weight=None, **kwargs):
         if weight:
-            if metric is None:
-                metric = 'Weighted Sum'
+            metric = self._label_metric(metric or 'Weighted Sum')
             # python-native inner product
             y = sum(map(operator.mul, self.ys, weight))
         else:
-            if metric is None:
-                metric = 'Cumulative Amount'
+            metric = self._label_metric(metric or 'Total')
             y = sum(self.ys)
         self._write_metric(metric, y, **kwargs)
 
     def report_average(self, metric=None, weight=None, **kwargs):
         if weight:
-            if metric is None:
-                metric = 'Weighted Average'
+            metric = self._label_metric(metric or 'Weighted Average')
             # python-native inner product
             y = sum(map(operator.mul, self.ys, weight)) / sum(weight)
         else:
-            if metric is None:
-                metric = 'Simple Average'
+            metric = self._label_metric(metric or 'Simple Average')
             y = sum(self.ys) / len(self.ys)
         self._write_metric(metric, y, **kwargs)
 

@@ -93,7 +93,7 @@ class XlsxScenarioUpdater(object):
             frag = self._fg[term.fragment]
             scen = term.scenario
             try:
-                t = self._fg.find_term(term.termination)
+                t = self._fg.get(term.termination)
             except (EntityNotFound, UnknownOrigin):
                 self._unrec.append((term.fragment, term.termination))
                 continue

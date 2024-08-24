@@ -256,7 +256,7 @@ class XlsxForegroundUpdater(XlsxUpdater):
                     f.to_foreground()
                     continue
                 try:
-                    term = self.ar.find_term(frag['termination'])
+                    term = self.ar.get(frag['termination'])
                 except (EntityNotFound, UnknownOrigin):
                     self._unrec.append((f.external_ref, frag['termination']))
                     continue
@@ -289,7 +289,7 @@ class XlsxForegroundUpdater(XlsxUpdater):
                 print('  [%s] -> %s' % (frag, term))
 
     def get_flow(self, flow):
-        return self.ar.get_local(flow)
+        return self.ar.get(flow)
 
     def get_context(self, cx):
         return self.ar.context(cx)

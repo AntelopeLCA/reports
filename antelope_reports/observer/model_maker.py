@@ -295,7 +295,7 @@ class ModelMaker(QuickAndEasy):
         else:
             flow = self.fg[flow_or_ref]
             if flow is None:
-                flow = self.fg.get_local(flow_or_ref)  # raises EntityNotFound eventually
+                flow = self.fg.get(flow_or_ref)  # raises EntityNotFound eventually
                 # raise EntityNotFound(flow_or_ref)
 
             try:
@@ -370,14 +370,14 @@ class ModelMaker(QuickAndEasy):
         rx = self._find_reference_exchange(row)
 
         if row.get('child_flow'):
-            child_flow = self.fg.get_local(row.get('child_flow'))
+            child_flow = self.fg.get(row.get('child_flow'))
         else:
             if hasattr(rx, 'flow'):
                 child_flow = rx.flow
             else:
                 cf_ref = row.get('flow_name') or row.get('term_flow')
                 if cf_ref:
-                    child_flow = self.fg.get_local(cf_ref)
+                    child_flow = self.fg.get(cf_ref)
                 else:
                     raise NoInformation
 
@@ -631,7 +631,7 @@ class ModelMaker(QuickAndEasy):
 
         self.fg.observe(beta, row_dict['value'], name=beta_name)
 
-        prod = self.fg.get_local(dp)
+        prod = self.fg.get(dp)
         try:
             output = next(beta.children_with_flow(prod))
         except StopIteration:
@@ -700,8 +700,8 @@ class ModelMaker(QuickAndEasy):
         truck_mdl = self.fg[trans_truck]
         ocean_mdl = self.fg[trans_ocean]
 
-        td = self.fg.get_local(product_ref)
-        dp = self.fg.get_local(disp_ref)
+        td = self.fg.get(product_ref)
+        dp = self.fg.get(disp_ref)
 
         name = 'Displacement, %s displ. %s' % (td.name, dp.name)
 

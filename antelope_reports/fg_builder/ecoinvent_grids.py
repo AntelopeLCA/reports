@@ -153,7 +153,7 @@ class EcoinventGrids(object):
 
     def _create_grid_fragment(self, fg, name, model, grids, name_regex):
         origin = self._org(model)
-        terms = [fg.find_term(g, origin=origin) for g in grids]
+        terms = [fg.cascade(origin).get(g) for g in grids]
         if name_regex is not None:
             terms = list(t for t in terms if bool(re.search(name_regex, t['name'], flags=re.IGNORECASE)))
 

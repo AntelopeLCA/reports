@@ -505,16 +505,16 @@ class KPIBase(object):
 
 
 class ExtensiveKpi(KPIBase):
-    def content(self, weight=None, **kwargs):
-        self.report_value()
+    def content(self, weight=None, metric=None, **kwargs):
+        self.report_value(**kwargs)
         for k in [-2, 0]:
             self.report_change(k)
-        self.report_total(weight=weight)
+        self.report_total(weight=weight, metric=metric, **kwargs)
 
 
 class IntensiveKpi(KPIBase):
-    def content(self, weight=None, **kwargs):
-        self.report_value()
+    def content(self, weight=None, metric=None, **kwargs):
+        self.report_value(**kwargs)
         for k in [-2, 0]:
             self.report_change(k)
-        self.report_average(weight=weight)
+        self.report_average(weight=weight, metric=metric, **kwargs)

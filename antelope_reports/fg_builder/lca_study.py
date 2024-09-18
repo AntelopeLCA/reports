@@ -513,7 +513,7 @@ class LcaStudy:
                 else:
                     print('%s: Skipping unknown scenario key %s=%g' % (k, i, v))
 
-    def set_knob_scenarios(self, knobs):
+    def set_knob_scenarios(self, knobs, unset=False):
         """
         Apply parameter values to a set of "knobs" to define scenarios.
         Similar to set_scenario_knobs(), except that the structure of the dict is inverted: instead of the
@@ -532,4 +532,7 @@ class LcaStudy:
                 if scenario not in scenarios:
                     scenarios[scenario] = dict()
                 scenarios[scenario][knob] = value
-        self.set_scenario_knobs(scenarios)
+        if unset:
+            self.unset_scenario_knobs(scenarios)
+        else:
+            self.set_scenario_knobs(scenarios)

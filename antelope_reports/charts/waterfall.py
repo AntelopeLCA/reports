@@ -81,6 +81,21 @@ def grab_stages(*results, sort=None):
         return sorted(stages, key=sort)
 
 
+def grab_names(*results, field=None, default='Other'):
+    d = dict()
+    for r in results:
+        for k in r.keys():
+            if k in d:
+                continue
+            c = r[k]
+            if field:
+                n = c.entity.get(field, default)
+            else:
+                n = c.name
+            d[k] = n
+    return d
+
+
 def _data_range(data_array):
     """
 
@@ -125,6 +140,8 @@ class WaterfallChart(object):
     _draw_ylabel = (0,)
 
     def _stage_style(self, stage):
+        if self._names:
+            stage = self._names.get(stage, stage)
         if stage in self._color_dict:
             this_style = {'color': self._color_dict[stage]}
         else:
@@ -209,10 +226,10 @@ class WaterfallChart(object):
             self._ax[self._qs[i]] = ax
 
     def __init__(self, *results, stages=None, color=None, color_dict=None,
-                 style=None, style_dict=None,
-                 include_net=True, net_name='remainder',
+                 style=None, style_dict=None, stage_property=None, stage_default='Other',
+                 include_net=True, net_name='remainder', data_free=False,
                  filename=None, size=6, autorange=False, font_size=None,
-                 aspect=0.1, case_sep=2.1, row_sep=None, col_sep=0.25, n_cols=None, **kwargs):
+                 aspect=0.1, case_sep=None, row_sep=None, col_sep=0.25, n_cols=None, **kwargs):
         """
         Create a waterfall chart that compares the stage contributions of separate LciaResult objects.
 
@@ -232,15 +249,21 @@ class WaterfallChart(object):
         :param stages: an ordering of stages. use grab_stages(*results) to get a complete list, then permute it.
         (default ordering is by score of the first quantity, decreasing)
 
-        :param color:
-        :param color_dict:
+        :param color: color to use for all bars
+        :param color_dict: dictionary of stage name to color for specific stages
 
         :param style: default style spec for each bar (to override pyplot bar/barh default
         :param style_dict: dict of dicts for custom styles
 
+        :param stage_property: if stages is not specified explicitly, property to grab for stage naming (default
+         is to grab entity.name)
+        :param stage_default: ['Other'] if stage_property is specified, label to use if the property is missing
+
         :param include_net: [True] whether to include a net-result bar, if a discrepancy exists between the stage query
          and the total result. This is ignored- a discrepancy is always reported
         :param net_name: ['remainder'] what to call the net-result bar
+
+        :param data_free: [False] whether to suppress printing numeric values
 
         :param n_cols: number of columns in which to arrange the plots. Defaults to one row, except if n > 4 and the
         resulting figure has an aspect ratio of greater than 3:1, in which case uses a kx4 grid.
@@ -250,13 +273,24 @@ class WaterfallChart(object):
         :param autorange: [False] whether to auto-range the results (no longer supported)
         :param font_size: [None] set text [numbers smaller]
         :param kwargs: aspect: bar height per fig width [0.1]
-        case_sep [2.1 bar widths], col_sep=0.25in, num_format [%3.2g], bar_width [0.85] font_size [None] row_sep [None]
+        case_sep [2.1 bar widths, or 1.2 bar widths if data-free (no cumulative indicator)],
+        col_sep=0.25in,
+        num_format [%3.2g],
+        bar_width [0.85]
+        font_size [None]
+        row_sep [None]
         """
 
         self._qs = []
         self._cases = []
         self._res_by_case = defaultdict(list)
         self._res_by_q = defaultdict(list)
+        self.data_free = bool(data_free)
+        if case_sep is None:
+            if self.data_free:
+                case_sep = 1.2
+            else:
+                case_sep = 2.1
 
         # sort/group results by case and by quantity
         for res in results:
@@ -276,11 +310,16 @@ class WaterfallChart(object):
         fontsize = self._font_size or 12
 
         # group stages by case
+        labels = []
         if stages is None:
             stages = {case: grab_stages(*ress) for case, ress in self._res_by_case.items()}
+            self._names = grab_names(*results, field=stage_property, default=stage_default)
+
         else:
+            # I have no idea what's going on here
             stages = {case: list(filter(lambda x: x in grab_stages(*ress), stages))
                       for case, ress in self._res_by_case.items()}
+            self._names = None
 
         self._stages_by_case = stages
 
@@ -290,6 +329,11 @@ class WaterfallChart(object):
 
         # extract data from LciaResult objects-- and compute net-balance
         for case in self._cases:
+            if self._names:
+                labels += [self._names[k] for k in self._stages_by_case[case]]
+            else:
+                labels += self._stages_by_case[case]
+
             net_flag = False
             for res in self._res_by_case[case]:
                 data, net = res.contrib_new(*self._stages_by_case[case], autorange=autorange)
@@ -297,7 +341,9 @@ class WaterfallChart(object):
                 if abs(net) * 1e8 > (_range[1] - _range[0]):
                     # only include remainder if it is greater than 10 ppb
                     net_flag = True
+                    labels.append(self._net_name)
                     break
+
             nf = net_flag and include_net
             self._include_net[case] = nf
 
@@ -321,7 +367,6 @@ class WaterfallChart(object):
 
             start = 0
             yticks = []
-            stgs = []
 
             case_res = dict()
             for res in self._res_by_q[q]:
@@ -333,18 +378,16 @@ class WaterfallChart(object):
             for case in self._cases:
                 # write scenario name on the left if there are multiple scenarios
                 if i in self._draw_ylabel:
-                    if len(self._cases) > 1:
+                    if case and case != 'None':  # len(self._cases) > 1:
                         ax.text(0, start - 0.5, '%s ' % case, ha='right', fontsize=fontsize, fontweight='bold')
                 start, yt = self._waterfall_case_horiz(ax, case_res[case], start, **kwargs)
                 yticks.extend(yt)
-                stgs.extend(self._stages_by_case[case])
-                if self._include_net[case]:
-                    stgs.append(self._net_name)
 
                 if case != self._cases[-1]:
                     start += case_sep
                 else:
-                    start += 1.2
+                    if self.data_free is False:
+                        start += 1.2
                 # if len(self._cases) > 1:
                 # add scenario name text
 
@@ -352,13 +395,13 @@ class WaterfallChart(object):
             # yticks.append(yticks[-1] + case_sep)
             # stgs.append('')
 
-            if len(self._cases) == 1:
+            if 0:  # len(self._cases) == 1:
                 # scenario name in title
                 sc_name = self._cases[0] or ''
                 ax.set_title('%s\n%s' % (self._q['Name'], sc_name), fontsize=fontsize)
             else:
                 # scenario name handled above
-                ax.set_title('%s' % self._q['Name'], fontsize=fontsize)
+                ax.set_title('%s\n%s' % (self._q['Name'], self._q.unit), fontsize=fontsize)
 
                 # ## not sure why we are doing this
                 # yticks.append(yticks[-1] + case_sep)
@@ -366,7 +409,7 @@ class WaterfallChart(object):
 
             if i in self._draw_ylabel:
                 ax.set_yticks(yticks)
-                ax.set_yticklabels(stgs)
+                ax.set_yticklabels(labels)
                 ax.set_ylim([start, -1])
             else:
                 ax.set_yticks([])
@@ -405,6 +448,9 @@ class WaterfallChart(object):
             '''
             ax.set_xlabel(self._q.unit)
             ax.ticklabel_format(axis='x', scilimits=(-3, 3))
+
+            if self.data_free:
+                ax.set_xticks([])
 
             # font size
             if self._font_size:
@@ -447,7 +493,10 @@ class WaterfallChart(object):
 
             style = self._stage_style(self._stages_by_case[res.scenario][i])
 
-            self._draw_one_bar_with_label(ax, style, center, cum, dat, bar_width, num_format)
+            if self.data_free:
+                self._draw_one_bar_without_label(ax, style, center, cum, dat, bar_width)
+            else:
+                self._draw_one_bar_with_label(ax, style, center, cum, dat, bar_width, num_format)
 
             cum += dat
             center += 1
@@ -455,10 +504,17 @@ class WaterfallChart(object):
         if self._include_net[res.scenario]:
             yticks.append(center)
             style = {'color': net_color}
-            self._draw_one_bar_with_label(ax, style, center, cum, net, bar_width, num_format)
+            if self.data_free:
+                self._draw_one_bar_without_label(ax, style, center, cum, net, bar_width)
+            else:
+                self._draw_one_bar_with_label(ax, style, center, cum, net, bar_width, num_format)
 
             cum += net
             center += 1
+
+        if self.data_free:
+            # return now
+            return center, yticks
 
         # cumsum marker
         if self._font_size:
@@ -508,6 +564,21 @@ class WaterfallChart(object):
         ax.text(x, center + _low_gap, total_format % cum, ha=ha, va='top', fontsize=fontsize)
 
         return center, yticks
+
+    @staticmethod
+    def _draw_one_bar_without_label(ax, style, center, cum, dat, bar_width):
+        _conn_color = (0.3, 0.3, 0.3)
+        color = style['color']
+
+        if dat < 0:
+            style['color'] = _fade_color(color)
+
+        ax.barh(center, dat, left=cum, height=bar_width, **style)
+
+        # connector
+        if cum != 0:
+            ax.plot([cum, cum], [center - 0.5 * bar_width, center - 1 + 0.5 * bar_width],
+                    color=_conn_color, zorder=-1, linewidth=0.5)
 
     def _draw_one_bar_with_label(self, ax, style, center, cum, dat, bar_width, num_format):
         _h_gap = self.int_threshold * 0.11

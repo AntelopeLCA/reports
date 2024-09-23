@@ -65,6 +65,10 @@ class ModelGraph(object):
         self._graph.add_node(self._refflow)
         self.anchor(self._model, self._refflow)
 
+    @property
+    def graph(self):
+        return self._graph
+
     def get_group(self, frag):
         if self._group is None:
             return frag.name

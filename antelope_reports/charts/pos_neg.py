@@ -488,9 +488,14 @@ class PosNegCompareError(object):
         :param index:
         :return:
         """
-        p = self._pos[index]
-        n = self._neg[index]
+        scale = self._pna[index]._ar_scale
+        if scale == 1:
+            num_fmt = '%3.2g'
+        else:
+            num_fmt = '%.3g'
+        p = self._pos[index] * scale
+        n = self._neg[index] * scale
         return {'Unit': self._pna[index].unit,
-                'Incurred Impact': '%3.2g' % p,
-                'Avoided Impact': '%3.2g' % n,
-                'Net Total': '%3.2g' % (p+n)}
+                'Incurred Impact': num_fmt % p,
+                'Avoided Impact': num_fmt % n,
+                'Net Total': num_fmt % (p+n)}

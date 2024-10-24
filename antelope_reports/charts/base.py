@@ -118,14 +118,22 @@ def has_pos_neg(res):
 
 def save_plot(file, close_after=True, transparent=True, format=None):
 
+    kwargs = {
+        'transparent': transparent,
+        'format': format,
+        'bbox_inches': 'tight'
+    }
+
     if format is None:
         n, f = os.path.splitext(file)
         if f:
             format = f[1:]
+            if format == 'png':
+                kwargs['dpi'] = 300
         else:
             format = 'eps'
 
-    plt.savefig(file, format=format, bbox_inches='tight', transparent=transparent)
+    plt.savefig(file, **kwargs)
     if close_after:
         plt.close()
 

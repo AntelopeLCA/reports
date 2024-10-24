@@ -155,6 +155,17 @@ class KPIBase(object):
                                  ha='left', va='baseline', **amount_args)
         self.metrics.append((t0, t1, t2))
 
+    def write_text(self, text, fontsize=None, **kwargs):
+        if fontsize is None:
+            fontsize = self.fontsize
+
+        self.content_row -= (fontsize * 1.15 / self.font_hgt)  # normalized units
+
+        t0 = self.frame.text(0.015, self.content_row, text, fontsize=fontsize,
+                             ha='left', va='baseline', **kwargs)
+
+        self.metrics.append((t0, None, None))
+
     def __init__(self, title, subtitle, unit, comment=None, figsize=(6.5, 1.8), text_f=0.55, frame_lw=1.2, long=False,
                  graph_l_m_in=0.39, graph_b_m_in=0.39,
                  metrics=(0.85, 0.88),
@@ -181,7 +192,7 @@ class KPIBase(object):
 
         comment_f = comment_in / hgt
 
-        self.title_pin = 1.0 - 0.67 * title_in / hgt  # vertical pin for title/subtitle break
+        self.title_pin = 1.0 - 0.33 / hgt  # vertical pin for title/subtitle break - fixed
         if long:
             self.numchars = int(16 * wid)  # approx width of content in number of characters (at 10 pt)
         else:

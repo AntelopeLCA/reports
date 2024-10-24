@@ -443,9 +443,13 @@ class LcaStudy:
         fg = self._matching_foreground(tgt.origin)
         flow = fg[child]
         cfs = list(tgt.children_with_flow(flow))
+        if len(cfs) == 0:
+            cfs = list(tgt.children_with_flow(flow, recurse=True))
+            if len(cfs) == 0:
+                cfs = list(tgt.children_with_flow(flow, match=True, recurse=True))
         if len(cfs) == 1:
             cf = cfs[0]
-            if mult and factor is not None:
+            if mult and (factor is not None):
                 base_value = cf.exchange_value(scenario=sc, observed=True)
                 value = base_value * factor
             else:
@@ -473,13 +477,13 @@ class LcaStudy:
                 continue
             for i, v in vd.items():
                 if isinstance(i, tuple):
-                    self.apply_ad_hoc_parameter(k, i, None, mult=False)
+                    self.apply_ad_hoc_parameter(k, i, None)
                 elif isinstance(i, str):
                     frag = self._resolve_term(i)
                     fg = self._matching_foreground(frag.origin)
                     fg.observe(frag, scenario=k, exchange_value=None)
 
-    def set_scenario_knobs(self, scenarios):
+    def set_scenario_knobs(self, scenarios, mult=True):
         """
         Apply parameter values to a set of "knobs" (fragment names) to define scenarios.
         Note: if "knob name" is a tuple, interpret it as an ad hoc parameterization, specifying the parent fragment,
@@ -490,6 +494,7 @@ class LcaStudy:
         :param scenarios: (dict of dicts) mapping of scenario names to {knob name: value} mappings - a scenario will
          be created for each key, with the corresponding knobs set to spec.  Use 'scenario': True to add scenario
          flags
+        :param mult: whether factors in ad-hoc scenarios should be multiplicative [True] or absolute [False]
         :return: None
         """
         if scenarios is None or len(scenarios) == 0:
@@ -505,7 +510,7 @@ class LcaStudy:
                     # valid setting at runtime; nothing to do here
                     continue
                 if isinstance(i, tuple):
-                    self.apply_ad_hoc_parameter(k, i, v)
+                    self.apply_ad_hoc_parameter(k, i, v, mult=mult)
                 elif isinstance(i, str):
                     frag = self._resolve_term(i)
                     fg = self._matching_foreground(frag.origin)
@@ -513,7 +518,7 @@ class LcaStudy:
                 else:
                     print('%s: Skipping unknown scenario key %s=%g' % (k, i, v))
 
-    def set_knob_scenarios(self, knobs, unset=False):
+    def set_knob_scenarios(self, knobs, unset=False, mult=True):
         """
         Apply parameter values to a set of "knobs" to define scenarios.
         Similar to set_scenario_knobs(), except that the structure of the dict is inverted: instead of the
@@ -521,6 +526,8 @@ class LcaStudy:
         specified by scenario.  This routine simply re-packs the specification and calls set_scenario_knobs().
 
         :param knobs: (dict of dicts) mapping knob name to (scenario: value)
+        :param unset: [False] un-set the given knob-scenario mapping (disregards value)
+        :param mult: [True] whether ad hoc parameters are multiplicative or absolute-valued (should be per-parameter, tbh)
         :return:
         """
         if knobs is None or len(knobs) == 0:
@@ -535,4 +542,4 @@ class LcaStudy:
         if unset:
             self.unset_scenario_knobs(scenarios)
         else:
-            self.set_scenario_knobs(scenarios)
+            self.set_scenario_knobs(scenarios, mult=mult)

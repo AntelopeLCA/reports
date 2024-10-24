@@ -1,4 +1,4 @@
-from xlstools import GoogleSheetReader
+from xlstools.google_sheet_reader import GoogleSheetReader
 from googleapiclient.errors import HttpError
 
 INDEX_HEADINGS = ('Abbreviation', 'Name', 'ShortName', 'Method', 'Category', 'Indicator', 'unit', 'uuid', 'Comment', 'Notes')

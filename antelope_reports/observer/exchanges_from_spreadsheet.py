@@ -7,6 +7,7 @@ from antelope.interfaces import InvalidDirection
 
 from .float_conv import to_float
 
+
 class ValueIsBalance(Exception):
     """
     Used to signal when an exchange is reached that is designated as a balance.

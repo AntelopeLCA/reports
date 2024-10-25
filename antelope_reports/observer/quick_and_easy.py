@@ -10,7 +10,7 @@ from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
 
-tr = str.maketrans(' ', '_', ',[]()*&^%$#@')
+tr = str.maketrans(' ', '_', ',[]()*&^%$#@/\\')
 
 
 class AmbiguousResult(Exception):

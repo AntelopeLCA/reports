@@ -95,9 +95,22 @@ class QuickAndEasy(object):
         return cls(fg, terms=terms, **kwargs)
 
     def set_terms(self, terms):
+        """
+        Maps flow / term specifications (string) to termination specs.
+        :param terms: should be a mapping. Keys should be external_ref or term external_ref or context name. Values
+         can be: an origin-external ref tuple, an entity (with entity_type attribute), or None (force cutoff).
+        :return:
+        """
         if terms:
             for k, v in terms.items():
-                self._terms[k] = self.fg.catalog_ref(*v)
+                if isinstance(v, tuple) or isinstance(v, list):
+                    self._terms[k] = self.fg.catalog_ref(*v)
+                elif v is None:
+                    self._terms[k] = None
+                elif hasattr(v, 'entity_type'):
+                    self._terms[k] = v
+                else:
+                    print('skipping unrecognized term spec %s: %s' % (k, v))
 
     def _populate_unit_map(self):
         for q in ('mass', 'volume', 'net calorific value', 'number of items',
@@ -140,7 +153,7 @@ class QuickAndEasy(object):
             self.xlsx = xlsx
 
         if taps:
-            self.load_taps(taps)
+            self.load_taps_from_spreadsheet(taps)
 
     @property
     def xlsx(self):
@@ -359,7 +372,7 @@ class QuickAndEasy(object):
         :param child_flow:
         :param direction: ['Input'] exchange direction w/r/t parent
         :param scenario:
-        :param term: what to terminate the child flow to. None = cutoff. True = to foreground. all others = term node
+        :param term: what to terminate the child flow to. None = cutoff. True = to foreground. all others = as specified
         :param term_flow:
         :param include_zero: [False] whether to add and include child flows with observed 0 EVs
         :param kwargs: passed to new fragment creation
@@ -385,7 +398,15 @@ class QuickAndEasy(object):
 
         return c
 
-    def load_taps(self, sheetname='taps'):
+    def add_tap_recipes(self, node):
+        for flow, _tap in self._taps.items():
+            direction, term = _tap
+            self.add_tap(node, flow, direction=direction, term=term, include_zero=False)
+
+    def store_tap_recipe(self, tap_flow, tap_direction, target):
+        self._taps[tap_flow] = tap_direction, target
+
+    def load_taps_from_spreadsheet(self, sheetname='taps'):
         sheet = self.xlsx[sheetname]
         for r in range(1, sheet.nrows):
             row = sheet.row_dict(r)
@@ -401,7 +422,7 @@ class QuickAndEasy(object):
                 tgt = self.fg.cascade(tgt_origin).get(row['target_ref'])
             direction = row.get('direction', 'Input')
 
-            self._taps[flow] = direction, tgt
+            self.store_tap_recipe(flow, direction, tgt)
 
     def load_process_model(self, sheetname, prefix=None):
         """

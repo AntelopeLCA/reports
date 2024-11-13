@@ -15,13 +15,14 @@ def traci_2_replicate_nox_no2(q):
         q.characterize(flowable='nitrogen dioxide', ref_quantity=cf.ref_quantity, context=cf.context, value=cf.value)
 
 
-def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication'):
+def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication', omit_n2=True):
     """
     Construct a combined eutrophication indicator that is the union of the TRACI 2.1 Eutrophication Air and
     Eutrophication Water methods.
     :param traci: Catalog query containing the TRACI 2.1 implementation
     :param fg: Foreground to contain the new combined eutrophication method
     :param external_ref: ('Eutrophication') what external reference to assign to the newly created quantity
+    :param omit_n2: [True] skip the CF on gaseous nitrogen
     :return:
     """
     old_euts = [traci.get(k) for k in ('Eutrophication Air', 'Eutrophication Water')]
@@ -37,6 +38,14 @@ def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication'):
                               Comment="Union of TRACI 2.1 'Eutrophication Air' and 'Eutrophication Water'")
     for eu in old_euts:
         for cf in eu.factors():
+            if str(cf.flowable).lower() == 'nitrogen' and cf.context.name in ('air', 'to air'):
+                if omit_n2:
+                    print('Omitting gaseous nitrogen to air eutrophication\n%s' % cf)
+                    for loc in cf.locations:
+                        new_eut.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
+                                             value=0.0, location=loc, origin=cf.origin)
+                    continue
+
             for loc in cf.locations:
                 new_eut.characterize(flowable=cf.flowable, ref_quantity=cf.ref_quantity, context=cf.context,
                                      value=cf[loc], location=loc, origin=cf.origin)
@@ -45,7 +54,10 @@ def traci_2_combined_eutrophication(traci, fg, external_ref='Eutrophication'):
 
 def traci_2_biogenic_co2(traci, fg, external_ref='gwp_bio_co2', indicator='kg CO2eq incl bio'):
     """
-    Duplicate the GWP method, but force the duplicate to compute biogenic CO2: see antelope.flows.flow.Flow.lookup_cf()
+    Duplicate the GWP method, but force the duplicate to compute biogenic CO2: see
+    antelope_core.implementations.quantity.do_lcia()
+    antelope_core.implementations.quantity.CO2QuantityConversion
+    antelope.flow.Flow.is_co2
     :param traci:
     :param fg:
     :param external_ref:

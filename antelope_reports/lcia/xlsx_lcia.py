@@ -1,3 +1,4 @@
+from antelope import EntityNotFound
 from xlstools.google_sheet_reader import GoogleSheetReader
 from googleapiclient.errors import HttpError
 
@@ -192,7 +193,11 @@ class QdbGSheetClient(object):
         sheet = self._create_or_retrieve_cf_sheet(item)
         for i in range(1, sheet.nrows):
             cf = sheet.row_dict(i)
-            rq = self.fg.get_canonical(cf['ref_quantity'])
+            try:
+                rq = self.fg.get_canonical(cf['ref_quantity'])
+            except EntityNotFound:
+                print('Ref quantity %s not found' % cf['ref_quantity'])
+                continue
             value = cf['value'] * rq.convert(to=cf['ref_unit'])  # check this!  if the CF is 45 points per gram and
             # the ref unit is kg, then that's 45,000 points per kg
             ent.characterize(cf['flowable'], rq, value, context=cf['context'], location=cf['locale'],  # why "location"?

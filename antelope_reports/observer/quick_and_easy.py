@@ -1,7 +1,7 @@
 from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope_core.contexts import NullContext
-from antelope import ConversionError
+from antelope import ConversionError, comp_dir
 from antelope import EntityNotFound, enum, MultipleReferences
 
 from .observations_from_spreadsheet import ObservationsFromSpreadsheet
@@ -113,7 +113,7 @@ class QuickAndEasy(object):
                     print('skipping unrecognized term spec %s: %s' % (k, v))
 
     def _populate_unit_map(self):
-        for q in ('mass', 'volume', 'net calorific value', 'number of items',
+        for q in ('mass', 'volume', 'net calorific value', 'number of items', 'node activity',
                   'length', 'area', 'freight', 'vehicle transport', 'person transport'):  # last one stated wins
             q_can = self.fg.get_canonical(q)
             self.add_to_unit_map(q_can)
@@ -359,7 +359,7 @@ class QuickAndEasy(object):
     '''
 
     def add_tap(self, parent, child_flow, direction='Input', scenario=None, term=None, term_flow=None,
-                include_zero=False, **kwargs):
+                include_zero=False, invert_direction=None, **kwargs):
         """
         Use fragment traversal to override an exchange belonging to a terminal activity.
          - retrieve the termination for the appropriate scenario
@@ -368,6 +368,20 @@ class QuickAndEasy(object):
          - observe the child flow to have the same exchange value as the computed exchange
          - optionally, terminate the child flow to the designated termination (or to foreground)
 
+        Two notes: 1- it is not appropriate to specify "terminate the flow to its current anchor" because in general
+        processes may have multiple instances of the same flow, set to different anchors.  User must specify.
+
+        2- The correct tap computation depends on the implementation of lci(), which matches fragment child flows to
+        the process's dependencies.  These dependencies are always reported with positive exchange values in their
+        natural direction (waste flows will appear as outputs and not negative-valued inputs). For this reason, the
+        tap machinery inverts the direction of taps when the anchor's reference value is negative.  Override this
+        by specifying invert_direction=True or False explicitly.
+
+        2a- this deals with the case of dependencies *from* [ecoinvent-style] treatment processes
+        (negative reference value) but it doesn't help in the case where the dependency *itself* is negative-valued.
+        This can't be detected automatically- so when adding taps in the ecoinvent-style, the direction of the
+        tap must always be 'Input'.
+
         :param parent:
         :param child_flow:
         :param direction: ['Input'] exchange direction w/r/t parent
@@ -375,6 +389,8 @@ class QuickAndEasy(object):
         :param term: what to terminate the child flow to. None = cutoff. True = to foreground. all others = as specified
         :param term_flow:
         :param include_zero: [False] whether to add and include child flows with observed 0 EVs
+        :param invert_direction: [None] whether to toggle the direction of the child flow. Default behavior is to
+         toggle direction ONLY IF the anchor's reference value is negative.
         :param kwargs: passed to new fragment creation
         :return:
         """
@@ -385,10 +401,23 @@ class QuickAndEasy(object):
                 print('Child child_flow returned 0 exchange', parent, child_flow)
                 return None
 
+        # tri-state logic
+        if invert_direction is True:
+            tgt_dir = comp_dir(direction)
+        elif invert_direction is False:
+            tgt_dir = direction
+        else:
+            rv = t.term_node.reference_value(t.term_flow)
+            if rv < 0:
+                print('Changing direction for inverted reference activity')
+                tgt_dir = comp_dir(direction)
+            else:
+                tgt_dir = direction
+
         try:
-            c = next(parent.children_with_flow(child_flow, direction=direction))
+            c = next(parent.children_with_flow(child_flow, direction=tgt_dir))
         except StopIteration:
-            c = self.fg.new_fragment(child_flow, direction, parent=parent, **kwargs)
+            c = self.fg.new_fragment(child_flow, tgt_dir, parent=parent, **kwargs)
         self.fg.observe(c, exchange_value=ev, scenario=scenario)
         if term is not None:
             if term is True:
@@ -441,10 +470,11 @@ class QuickAndEasy(object):
         exch_gen = exchanges_from_spreadsheet(sheet, origin=self.fg.origin)
         parent = self.fg[ref]  # this is BACKWARDS from standard- .get is supposed to silently return None !!MAJOR ALERT
         if parent is None:
-            fproc = self.fg.fragment_from_exchanges(exch_gen, ref=ref, term_dict=self._terms)
+            fproc = self.fg.fragment_from_exchanges(exch_gen, ref=ref, term_dict=self._terms, include_elementary=True)
         else:
             next(exch_gen)  # nowhere do we apply the incoming exch_gen to the parent!?
-            fproc = self.fg.fragment_from_exchanges(exch_gen, parent=parent, term_dict=self._terms)
+            fproc = self.fg.fragment_from_exchanges(exch_gen, parent=parent, term_dict=self._terms,
+                                                    include_elementary=True)
 
         fproc['StageName'] = sheetname
 

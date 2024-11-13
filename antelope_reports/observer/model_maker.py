@@ -1,4 +1,4 @@
-from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, ConversionError
+from antelope import EntityNotFound, UnknownOrigin, MultipleReferences, ConversionError, NoReference
 from antelope.interfaces.iindex import InvalidDirection, comp_dir, check_direction
 from antelope_foreground.terminations import FlowConversionError
 
@@ -73,8 +73,8 @@ class ModelMaker(QuickAndEasy):
 
     anchor spec:
     (these are used in _find_term_info(), ultimately passed to find_background_rx()
-    target_origin	-- origin for anchor node (context or cutoff if absent)
-    compartment	-- used for context flows if origin is not specified
+    target_origin	-- origin for anchor node
+    compartment	-- used for specifying elementary flows (leave origin blank)
     target_flow -- passed to find_background_rx as flow_name_or_ref (if blank, use child_flow if specified)
     locale	-- used as SpatialScope argument in find_background_rx
     target_name	-- used as process_name argument in find_background_rx
@@ -509,6 +509,9 @@ class ModelMaker(QuickAndEasy):
                 except MultipleReferences as e:
                     self._log_e(ssr, e)
                     print('## %03d ##: Multiple References %s' % (ssr, e.args))
+                except NoReference as e:
+                    self._log_e(ssr, e)
+                    print('## %03d ##: No Reference %s' % (ssr, e.args))
                 except BadExchangeValue as e:
                     self._log_e(ssr, e)
                     print('## %03d ##: Bad Exchange Value %s' % (ssr, e.args))

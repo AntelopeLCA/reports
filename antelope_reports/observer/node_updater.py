@@ -175,4 +175,5 @@ class NodeUpdater:
 
         print('%s => %s [%s]' % (self._branch.node, self._rx.process, _apply_scenario))
         self._branch.node.clear_termination(_apply_scenario)
-        self._branch.node.terminate(self._rx.process, term_flow=self._rx.flow, descend=self._branch.anchor.descend)
+        self._branch.node.terminate(self._rx.process, scenario=_apply_scenario,
+                                    term_flow=self._rx.flow, descend=self._branch.anchor.descend)

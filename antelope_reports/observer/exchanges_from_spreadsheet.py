@@ -8,6 +8,13 @@ from antelope.interfaces import InvalidDirection
 from .float_conv import to_float
 
 
+class EmptyFlowRef(Exception):
+    """
+    Used to signal a blank entry
+    """
+    pass
+
+
 class ValueIsBalance(Exception):
     """
     Used to signal when an exchange is reached that is designated as a balance.
@@ -47,7 +54,10 @@ def _popanykey(dct, *keys, strict=False):
     """
     for key in keys:
         if key.lower() in dct:
-            return dct.pop(key.lower())
+            k = dct.pop(key.lower())
+            if k == '':
+                continue
+            return k
     if strict:
         raise KeyError(keys)
     return None
@@ -62,6 +72,8 @@ def _exchange_params(origin, rowdict):
     """
     rowdict.pop('process', None)
     flow_ref = _popanykey(rowdict, 'flow', 'flowref', 'flow_ref', 'external_ref', strict=True)
+    if flow_ref is None:
+        raise EmptyFlowRef
     flow = CatalogRef(origin, flow_ref, entity_type='flow')
     dirn = check_direction(_popanykey(rowdict, 'direction', 'flowdir', strict=True))
     val = _popanykey(rowdict, 'value', 'amount', strict=True)
@@ -70,10 +82,12 @@ def _exchange_params(origin, rowdict):
     else:
         value = to_float(val)
     unit = _popanykey(rowdict, 'unit', 'units')
-    term = _popanykey(rowdict, 'context', 'compartment', 'target',
-                      'defaultprovider', 'activitylinkid', 'term', 'termination')
-    if term == '':
-        term = None
+    term = _popanykey(rowdict, 'target', 'defaultprovider', 'activitylinkid', 'term', 'termination', 'anchor_node')
+    if term is None:
+        cx = _popanykey(rowdict, 'context', 'compartment')
+        if cx is not None:
+            term = (cx,)  # convert to a context
+
     if value is ValueIsBalance:
         print('%s %s (balance) %s [%s]' % (flow, dirn, unit, term))
     else:
@@ -115,7 +129,9 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
 
     Optional
     'unit', 'units' - unit of measure for the flow
-    'context', 'compartment', 'defaultprovider', 'activitylinkid', 'target' - used to determine the termination of the exchange, default to None
+    'defaultprovider', 'activitylinkid', 'target', 'term', 'termination' - anchor of an intermediate exchange
+    'context', 'compartment' - context of an elementary exchange (if no anchor is found)
+    if neither term nor context is found, the exchange becomes a cutoff
 
     Ignored:
     'process' - ignored
@@ -160,6 +176,9 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
             continue
         try:
             flow_ref, dirn, value, units, term = _exchange_params(origin, c_flow)
+        except EmptyFlowRef:
+            print('==Row %02d== SKIP empty flow ref' % (row+1))
+            continue
         except KeyError as e:
             print('==Row %02d== SKIP  missing one of %s' % (row+1, e.args))
             continue

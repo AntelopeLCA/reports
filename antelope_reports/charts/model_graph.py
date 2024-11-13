@@ -18,7 +18,15 @@ class ModelGraph(object):
     """
     Creates a model graph in graphviz dot format using pydot.
     """
+    def _flowtext(self, text):
+        return line_break(text, start=self._text_width)
+
     def _dir(self, frag):
+        """
+        Returns the direction node
+        :param frag:
+        :return:
+        """
         if frag.is_balance:
             _d = pydot.Node(frag.uuid[:10] + '_d', shape="box", style="dotted", label="balance")
         else:
@@ -46,6 +54,7 @@ class ModelGraph(object):
         return _d
 
     def __init__(self, model, scenario=None, values=True, group='StageName', rankdir="RL", descend=False, text_width=25,
+                 focus=True,
                  **kwargs):
         """
 
@@ -61,9 +70,9 @@ class ModelGraph(object):
         self._descend = descend
 
         self._graph = pydot.Dot(model.name, graph_type='digraph', strict=True, rankdir=rankdir, **kwargs)
-        self._refflow = pydot.Node("ref flow", shape='box', height=0.25, label=model.flow.name)
+        self._refflow = pydot.Node("ref flow", shape='none', height=0.25, label=model.flow.name)
         self._graph.add_node(self._refflow)
-        self.anchor(self._model, self._refflow)
+        self.anchor(self._model, self._refflow, first=True)
 
     @property
     def graph(self):
@@ -78,34 +87,37 @@ class ModelGraph(object):
             return self._group(frag)
         return frag.name
 
-    def anchor(self, frag, node):
+    def anchor(self, frag, node, first=False):
         _d = self._add_dir(frag, node)
         lbl = frag.uuid[:10] + '_anch'
         term = frag.termination(self._scenario)
         if term.is_null:
             cutoff = pydot.Node(lbl, shape="none", label=frag.flow.name)
             self._graph.add_node(cutoff)
-            self._graph.add_edge(pydot.Edge(cutoff, _d, arrow=False))
+            self._graph.add_edge(pydot.Edge(cutoff, _d, arrowsize=0, minlen=1.3))
             return cutoff
         elif term.is_frag:
             if term.is_fg:
-                anchor = pydot.Node(lbl, shape="circle", label='')
+                if first:
+                    anchor = pydot.Node(lbl, shape="rectangle", style="rounded", label=frag.get('Name', frag.name))
+                else:
+                    anchor = pydot.Node(lbl, shape="circle", label='')
                 self._graph.add_node(anchor)
                 self._graph.add_edge(pydot.Edge(anchor, _d, arrowsize=0))
                 self.child_flows(frag, anchor)
             elif self._descend and frag.is_background:
-                anchor = pydot.Node(lbl, shape="box", label=frag.flow.name, height=0.25)
+                anchor = pydot.Node(lbl, shape="box", label=self._flowtext(frag.flow.name), height=0.25)
                 self._graph.add_node(anchor)
                 self._graph.add_edge(pydot.Edge(anchor, _d, arrowsize=0))
                 self.child_flows(term.term_node, anchor)
 
             else:
-                subfrag = pydot.Node(lbl, shape="doubleoctagon", height=0.35, label=term.term_node.external_ref)
+                subfrag = pydot.Node(lbl, shape="box", height=0.25, label=self._flowtext(term.term_flow.name))
                 self._graph.add_node(subfrag)
-                self._graph.add_edge(pydot.Edge(subfrag, _d, arrow=False))
+                self._graph.add_edge(pydot.Edge(subfrag, _d, arrowsize=0))
                 self.child_flows(frag, subfrag)
         elif term.is_context:
-            cx = pydot.Node(lbl, shape="box", style="dotted", height=0.25, label=term.term_node.name)
+            cx = pydot.Node(lbl, shape="box", style="dotted", height=0.25, label=self._flowtext(term.term_node.name))
             self._graph.add_node(cx)
             self._graph.add_edge(pydot.Edge(cx, _d, arrowsize=0))
             return cx

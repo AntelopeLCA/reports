@@ -3,7 +3,11 @@ try:
     from xlstools.google_sheet_reader import GoogleSheetReader
 except ImportError:
     logging.error('No GoogleSheetReader found')
-    GoogleSheetReader = object
+
+    class GoogleSheetReader:
+        def __init__(self, credentials, spreadsheet_id):
+            self.credentials = credentials
+            self.sheet_id = spreadsheet_id
 
 from .observer.headers import HEADERS, WIDTHS, TAB_COLORS, SpannerMeta
 
@@ -107,6 +111,19 @@ class GSheetObserver(GoogleSheetReader):
 
         return sheet_id
 
+    def _production_sheet_config(self, sheet_name):
+        condition = {
+            'type': 'ONE_OF_RANGE',
+            'values': [
+                {'userEnteredValue': '=flows!$A:$A'}
+            ]
+        }
+        self.batch_update(self._request_sheet_properties(sheet_name, col_freeze=4, row_freeze=1),
+                          self._request_data_validation_column(sheet_name,
+                                                               HEADERS['production'].index('child_flow'),
+                                                               condition,
+                                                               start_row=1))
+
     def build_observatory(self):
         """
         Initializes the 'quantities', 'flows', 'flowproperties', 'spanners', 'production', and 'observations' sheets
@@ -121,20 +138,31 @@ class GSheetObserver(GoogleSheetReader):
         for k in ('quantities', 'flows', 'flowproperties', 'production', 'observations', 'taps', 'spanners'):
             if k not in self._sheetnames:
                 # only create the sheet if it doesn't already exist
-                sheet_id = self._create_and_format_sheet_by_recipe(k)
+                self._create_and_format_sheet_by_recipe(k)
 
                 if k == 'production':
-                    condition = {
-                        'type': 'ONE_OF_RANGE',
-                        'values': [
-                            {'userEnteredValue': '=flows!$A:$A'}
-                        ]
-                    }
-                    self.batch_update(self._request_sheet_properties(k, col_freeze=4, row_freeze=1),
-                                      self._request_data_validation_column(k,
-                                                                           HEADERS['production'].index('child_flow'),
-                                                                           condition,
-                                                                           start_row=1))
+                    self._production_sheet_config(k)
+
+    def new_production_sheet(self, sheet_name='production'):
+        if sheet_name not in self._sheetnames:
+            # only create the sheet if it doesn't already exist
+            self._create_and_format_sheet_by_recipe(sheet_name)
+
+        self._production_sheet_config(sheet_name)
+
+    @property
+    def spanners(self):
+        """
+        Generates spanners by entry in
+        :return:
+        """
+        spanners_meta = self.sheet_by_name('spanners')
+        for n in range(1, spanners_meta.nrows):
+            d = spanners_meta.row_dict(n)
+            if d['external_ref'] is None:
+                continue
+            if d['external_ref'] in self._sheetnames:
+                yield SpannerMeta.from_form(**d)
 
     def new_spanner(self, spanner_ref, source=None, spanners='spanners', **kwargs):
         # validates ref
@@ -143,7 +171,7 @@ class GSheetObserver(GoogleSheetReader):
 
         if spanner_ref not in self._sheetnames:
             self._create_and_format_sheet_by_recipe('spanner', sheet_name=spanner_ref)
-            self.batch_update(self._request_sheet_properties(spanner_ref, col_freeze=1))
+            self.batch_update(self._request_sheet_properties(spanner_ref, col_freeze=1, row_freeze=1))
 
         spanners_meta = self.sheet_by_name(spanners)
         rec = [k.value for k in spanners_meta.col(0)]

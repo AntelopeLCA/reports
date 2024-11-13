@@ -50,8 +50,8 @@ class SpannerMeta(BaseModel):
         if name is None:
             name = external_ref
 
-        return cls(external_ref=external_ref, name=name, description=description, author=author, source=source,
-                   version=version)
+        return cls(external_ref=external_ref, name=name, description=str(description), author=str(author),
+                   source=str(source), version=str(version))
 
 
 QUANTITIES_HEADER = ('external_ref', 'referenceUnit', 'Name', 'Comment', 'Synonyms')
@@ -60,7 +60,7 @@ FLOWPROPERTIES_HEADER = ('flow', 'ref_quantity', 'ref_unit', 'quantity', 'unit',
 
 SPANNERS_META = ('external_ref', 'name', 'description', 'author', 'source', 'version')
 
-SPANNER_HEADER = ('flow', 'direction', 'units', 'amount', 'amount_hi', 'amount_lo', 'type', 'Name', 'Comment',
+SPANNER_HEADER = ('flow', 'Name', 'direction', 'units', 'amount', 'amount_hi', 'amount_lo', 'context', 'Comment',
                   'stage_name', 'grouping', 'note')
 
 PRODUCTION_HEADER = ('prod_flow', 'ref_direction', 'ref_value', 'ref_unit',
@@ -106,7 +106,7 @@ WIDTHS = {
     'observations': {'activity': 220,
                      'child_flow': 220,
                      'units': 69},
-    'spanners': {'spanner': 150,
+    'spanners': {'external_ref': 150,
                  'name': 220,
                  'author': 160},
     'spanner': {'flow': 220,

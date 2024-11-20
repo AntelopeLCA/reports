@@ -10,13 +10,15 @@ class MultiModelRunner(LcaModelRunner):
         for frag in frags:
             self.add_fragment(frag)
 
-    def add_fragment(self, frag):
+    def add_fragment(self, frag, name=None):
         """
-        Need a way to systematically specify something other than .name
+
         :param frag:
+        :param name:
         :return:
         """
-        name = frag.name
+        if name is None:
+            name = frag.name
         if name not in self._scenarios:
             self.add_scenario(name)
         self._frags[name] = frag

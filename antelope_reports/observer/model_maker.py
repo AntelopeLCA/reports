@@ -199,7 +199,11 @@ class ModelMaker(QuickAndEasy):
             args = {k: row.get(v) for k, v in kwargs.items() if v is not None and row.get(v) is not None}
             if self.fg[ext_ref] is None:
                 new.add(ext_ref)
-            self.fg.add_or_retrieve(ext_ref, ref_q, the_name, **args)
+            f = self.fg.add_or_retrieve(ext_ref, ref_q, the_name, **args)
+            # update the name if it contains new information-- important for LCIA
+            if the_name != f['name'] and the_name != ext_ref:
+                f['name'] = the_name
+                f.clear_chars()
 
         print('Reviewed %d flows (%d new added)' % (count, len(new)))
 

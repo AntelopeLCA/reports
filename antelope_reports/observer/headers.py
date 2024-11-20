@@ -60,7 +60,7 @@ FLOWPROPERTIES_HEADER = ('flow', 'ref_quantity', 'ref_unit', 'quantity', 'unit',
 
 SPANNERS_META = ('external_ref', 'name', 'description', 'author', 'source', 'version')
 
-SPANNER_HEADER = ('flow', 'Name', 'direction', 'units', 'amount', 'amount_hi', 'amount_lo', 'context', 'Comment',
+SPANNER_HEADER = ('flow', 'direction', 'Name', 'amount', 'units', 'amount_hi', 'amount_lo', 'context', 'Comment',
                   'stage_name', 'grouping', 'note')
 
 PRODUCTION_HEADER = ('prod_flow', 'ref_direction', 'ref_value', 'ref_unit',

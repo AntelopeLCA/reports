@@ -375,12 +375,15 @@ class QuickAndEasy(object):
         the process's dependencies.  These dependencies are always reported with positive exchange values in their
         natural direction (waste flows will appear as outputs and not negative-valued inputs). For this reason, the
         tap machinery inverts the direction of taps when the anchor's reference value is negative.  Override this
-        by specifying invert_direction=True or False explicitly.
+        by specifying invert_direction=True or False explicitly.  NOTE: this is reinforfced by treatment in the
+        TarjanBackground - which reverses the directions of dependencies in the same condition.
 
         2a- this deals with the case of dependencies *from* [ecoinvent-style] treatment processes
         (negative reference value) but it doesn't help in the case where the dependency *itself* is negative-valued.
         This can't be detected automatically- so when adding taps in the ecoinvent-style, the direction of the
-        tap must always be 'Input'.
+        *exchange relation* query must always be 'Input'.
+
+        For now, we deal with this just by checking to see if 'ecoinvent' is in the query origin, and if so we
 
         :param parent:
         :param child_flow:
@@ -395,7 +398,15 @@ class QuickAndEasy(object):
         :return:
         """
         t = parent.termination(scenario)
-        ev = t.term_node.exchange_relation(t.term_flow, child_flow, direction)
+        _is_ecoinvent = bool(t.term_node.origin.find('ecoinvent') >= 0)
+
+        if _is_ecoinvent:
+            ev = t.term_node.exchange_relation(t.term_flow, child_flow, 'Input')
+            if direction == 'Output':
+                ev *= -1
+        else:
+            ev = t.term_node.exchange_relation(t.term_flow, child_flow, direction)
+
         if ev == 0:
             if not include_zero:
                 print('Child child_flow returned 0 exchange', parent, child_flow)

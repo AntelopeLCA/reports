@@ -14,70 +14,106 @@ class AllocationEngine(object):
     Single-product wrappers then encapsulate that aggregator by terminating to the allocation flow, optionally capping
     off the allocation fraction.
     """
+    def __init__(self, fg, spanner, alloc_flow, external_ref=None):
+        """
+        We store the spanner
+        :param fg: the foreground to contain the constructed fragments
+        :param spanner: the multi-output model to be allocated
+        :param alloc_flow: the flow (and reference quantity) to accumulate the allocated output
+        :param external_ref: [None] default: 'allocator_[spanner.external_ref]_[alloc_flow.external_ref]'
+        """
+        self._fg = fg
+        self._spanner = spanner
+        self._alloc_flow = alloc_flow
+        if external_ref is None:
+            external_ref = 'allocator_%s_%s' % (self._spanner.external_ref, alloc_flow.external_ref)
 
+        self._allocator = external_ref
+        self._build_allocation_container()
 
-def build_allocation_container(fg, spanner, alloc_flow, external_ref=None):
-    """
-    Builds an Allocation fragment: anchors the target spanner inside a superfragment, then catches all emerging
-    allocatable outputs and casts them to an allocation flow.
+    @property
+    def alloc_flow(self):
+        return self._alloc_flow
 
-    encapsulates the target activity inside a node, and then converts all
-    allocatable outputs of the activity to their allocation quantity.
-    - take the activity (spanner) to allocate
-    - create a new fragment with the same reference flow
-    - anchor it to the target spanner
+    @property
+    def allocator(self):
+        return self._fg[self._allocator]
 
-    :param fg:
-    :param spanner:
-    :param alloc_flow:
-    :param external_ref:
-    :return:
-    """
-    alloc_qty = alloc_flow.reference_entity
-    if external_ref is None or fg[external_ref] is None:
-        container = fg.new_fragment(flow=spanner.flow, direction=comp_dir(spanner.direction), exchange_value=spanner.cached_ev,
-                                    external_ref=external_ref)
-    else:
-        container = fg[external_ref]
-    fg.observe(container, exchange_value=spanner.observed_ev)
-    container['alloc_flow'] = alloc_flow.link
-    container.terminate(spanner)
-    for c in spanner.cutoffs(True):
-        if c.flow.cf(alloc_qty) != 0:
+    def _build_allocation_container(self):
+        """
+        Builds an Allocation fragment or "allocator": anchors the target spanner inside a superfragment, then catches
+        all emerging allocatable outputs and casts them to an allocation flow.
+
+        encapsulates the target activity inside a node, and then converts all
+        allocatable outputs of the activity to their allocation quantity.
+        - take the activity (spanner) to allocate
+        - create a new fragment with the same reference flow
+        - anchor it to the target spanner
+
+        :return:
+        """
+        alloc_qty = self.alloc_flow.reference_entity
+
+        if self.allocator is None:
+            container = self._fg.new_fragment(flow=self._spanner.flow, direction=comp_dir(self._spanner.direction),
+                                              exchange_value=self._spanner.cached_ev,
+                                              external_ref=self._allocator)
+        else:
+            container = self.allocator
+
+        self._fg.observe(container, exchange_value=self._spanner.observed_ev)
+        container['alloc_flow'] = self.alloc_flow.link
+        container.terminate(self._spanner)
+        for c in self._spanner.cutoffs(True):
+            if c.flow.cf(alloc_qty) != 0:
+                try:
+                    j = next(container.children_with_flow(c.flow))
+                except StopIteration:
+                    j = self._fg.new_fragment(c.flow, c.direction, parent=container)
+                    self._fg.new_fragment(self.alloc_flow, c.direction, parent=j, balance=True)
+
+                j.balance_flow.flow = self.alloc_flow
+
+        return container
+
+    def build_allocated_product(self, product_flow, direction='Output', external_ref=None, cap_activity=True):
+        """
+        This builds a single-output allocated production process for the named flow, using the previously
+        constructed allocator.
+        This caps off the facility activity flow and delivers a desired product flow with allocated burdens
+
+        :param product_flow:
+        :param direction: of product w.r.t allocated activity [default 'Output']
+        :param external_ref: default: '[product_flow.external_ref]_alloc_[alloc_flow.external_ref]
+        :param cap_activity: [True] conceal the allocator's activity share
+        :return:
+        """
+        if external_ref is None:
+            external_ref = '%s_alloc_%s' % (product_flow.external_ref, self.alloc_flow.external_ref)
+        if self._fg[external_ref] is None:
+            capsule = self._fg.new_fragment(flow=product_flow, direction=direction, exchange_value=1.0,
+                                            external_ref=external_ref)
+        else:
+            capsule = self._fg[external_ref]
+        self._fg.observe(capsule)
+        if capsule.balance_flow is None:
+            j = self._fg.new_fragment(flow=self.alloc_flow, direction=comp_dir(direction), parent=capsule, balance=True)
+        else:
+            j = capsule.balance_flow
+            j.flow = self.alloc_flow
+        j.terminate(self.allocator, term_flow=self.alloc_flow)
+
+        if cap_activity:
             try:
-                j = next(container.children_with_flow(c.flow))
+                k = next(j.children_with_flow(self.allocator.flow))
             except StopIteration:
-                j = fg.new_fragment(c.flow, c.direction, parent=container)
-                fg.new_fragment(alloc_flow, c.direction, parent=j, balance=True)
-    return container
+                k = self._fg.new_fragment(self.allocator.flow, direction=comp_dir(self.allocator.direction), parent=j)
+            k.terminate(NullContext)
+        else:
+            try:
+                k = next(j.children_with_flow(self.allocator.flow))
+                self._fg.delete(k)
+            except StopIteration:
+                pass
 
-
-def build_allocated_product(fg, product_flow, alloc_container, external_ref=None):
-    """
-    Allocation capsule
-    This caps off the facility activity flow and delivers a desired product flow with allocated burdens
-
-    :param fg:
-    :param product_flow:
-    :param alloc_container:
-    :param external_ref:
-    :return:
-    """
-    alloc_flow = fg.get(alloc_container.get('alloc_flow'))
-    if external_ref is None or fg[external_ref] is None:
-        capsule = fg.new_fragment(flow=product_flow, direction='Output', exchange_value=1.0, external_ref=external_ref)
-    else:
-        capsule = fg[external_ref]
-    fg.observe(capsule)
-    if capsule.balance_flow is None:
-        j = fg.new_fragment(flow=alloc_flow, direction='Input', parent=capsule, balance=True)
-    else:
-        j = capsule.balance_flow
-        j.flow = alloc_flow
-    j.terminate(alloc_container, term_flow=alloc_flow)
-    try:
-        k = next(j.children_with_flow(alloc_container.flow))
-    except StopIteration:
-        k = fg.new_fragment(alloc_container.flow, direction=comp_dir(alloc_container.direction), parent=j)
-    k.terminate(NullContext)
-    return capsule
+        return capsule

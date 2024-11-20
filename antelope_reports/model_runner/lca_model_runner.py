@@ -426,14 +426,23 @@ class LcaModelRunner(object):
         """
         return NotImplemented
 
-    def to_dataframe(self, index=None, **kwargs):
+    def to_dataframe(self, index=None, summary=True, **kwargs):
         """
         A minimal dataframe that largely duplicates scenario_summary_tbl()
         :param index:
+        :param summary: [True] report totals for each case. [False] group by agg_key
         :param kwargs:
         :return:
         """
         if index is None:
             index = list(self.quantities)
-        return DataFrame(({case: self._results[case, q].total() for case in self.scenarios} for q in self.quantities),
-                         index=index, **kwargs)
+        if summary:
+            return DataFrame(({case: self._results[case, q].total() for case in self.scenarios}
+                              for q in self.quantities),
+                             index=index, **kwargs)
+        else:
+            return DataFrame(((q['ShortName'], q.unit, scenario, c.entity[0], c.entity[1], c.cumulative_result)
+                              for scenario in self.scenarios
+                              for q in self.quantities
+                              for c in self.result(scenario, q).aggregate(key=self._agg).components()),
+                             columns=('Quantity', 'Unit', 'Case', 'Stage', 'Alt', 'Result'))

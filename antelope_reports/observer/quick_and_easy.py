@@ -464,12 +464,13 @@ class QuickAndEasy(object):
 
             self.store_tap_recipe(flow, direction, tgt)
 
-    def load_process_model(self, sheetname, prefix=None):
+    def load_process_model(self, sheetname, prefix=None, **kwargs):
         """
 
-        :param self:
-        :param sheetname:
-        :param prefix:
+
+        :param sheetname: the sheet containing inventory data
+        :param prefix: prefix to prepend (with '_') to the sheetname to form the external ref
+        :param kwargs: key-value pairs to assign as properties to the parent fragment
         :return:
         """
         sheet = self.xlsx[sheetname]
@@ -488,6 +489,8 @@ class QuickAndEasy(object):
                                                     include_elementary=True)
 
         fproc['StageName'] = sheetname
+        for k, v in kwargs.items():
+            fproc[k] = v
 
         fproc.show_tree(True)
         return fproc

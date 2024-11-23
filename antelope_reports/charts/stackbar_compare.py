@@ -64,8 +64,9 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
         bar_positions = np.arange(len(cases))  # X positions for bars
 
         # Plot stacked bars
-        for i, stage in enumerate(stages):
-            bottom = cumulative_sums.iloc[:, i - 1] if i > 0 else None
+        for i, stage in enumerate(stages[::-1]):  # reverse direction for legend order
+            ix = len(stages) - i - 2  # -1 for zero-indexing; -1 for cumsum offset
+            bottom = cumulative_sums.iloc[:, ix] if ix >= 0 else None
             ax.bar(bar_positions, indicator_data[stage], label=stage, bottom=bottom, width=0.8,
                    color=stage_colors[stage])
 
@@ -73,7 +74,7 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
         ax.set_title(f"{f_u}: {quantity}")
         ax.set_xlabel("Truck Type")
         ax.set_ylabel(unit)
-        ax.set_xlim([-0.5, 1.5])
+        ax.set_xlim([bar_positions[0] - 0.5, bar_positions[-1] + 0.5])
         ax.set_xticks(bar_positions)
         ax.set_xticklabels(cases, rotation=45)
         if ax is axes[-1]:

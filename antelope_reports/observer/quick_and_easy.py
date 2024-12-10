@@ -170,6 +170,21 @@ class QuickAndEasy(object):
             self._xlsx = xlsx
             self.refresh_entities()
 
+    @property
+    def quantities(self):
+        """
+        generates quantities by entry in 'quantities'
+        :return:
+        """
+        quantities = self._xlsx.sheet_by_name('quantities')
+        for n in range(1, quantities.nrows):
+            d = quantities.row_dict(n)
+            if d.get('external_ref') is None:
+                continue
+            if self.fg[d['external_ref']] is None:
+                continue
+            yield self.fg[d['external_ref']]
+
     def refresh_entities(self, quiet=None):
         if self._xlsx is None:
             raise ValueError('xlsx is missing')
@@ -179,6 +194,8 @@ class QuickAndEasy(object):
             self.fg.apply_xlsx(self._xlsx, quiet=quiet)
         except AttributeError:
             next(self.fg._iface('foreground')).apply_xlsx(self._xlsx, quiet=quiet)
+        for q in self.quantities:
+            self.add_to_unit_map(q)
 
     @property
     def fg(self):
@@ -464,12 +481,14 @@ class QuickAndEasy(object):
 
             self.store_tap_recipe(flow, direction, tgt)
 
-    def load_process_model(self, sheetname, prefix=None, **kwargs):
+    def load_process_model(self, sheetname, prefix=None, auto_anchor=True, include_elementary=True, **kwargs):
         """
 
 
         :param sheetname: the sheet containing inventory data
         :param prefix: prefix to prepend (with '_') to the sheetname to form the external ref
+        :param auto_anchor: [True] pass to fragment_from_exchanges
+        :param include_elementary: [True] pass to fragment_from_exchanges
         :param kwargs: key-value pairs to assign as properties to the parent fragment
         :return:
         """
@@ -482,11 +501,14 @@ class QuickAndEasy(object):
         exch_gen = exchanges_from_spreadsheet(sheet, origin=self.fg.origin)
         parent = self.fg[ref]  # this is BACKWARDS from standard- .get is supposed to silently return None !!MAJOR ALERT
         if parent is None:
-            fproc = self.fg.fragment_from_exchanges(exch_gen, ref=ref, term_dict=self._terms, include_elementary=True)
+            fproc = self.fg.fragment_from_exchanges(exch_gen, ref=ref, term_dict=self._terms,
+                                                    include_elementary=include_elementary,
+                                                    auto_anchor=auto_anchor)
         else:
             next(exch_gen)  # nowhere do we apply the incoming exch_gen to the parent!?
             fproc = self.fg.fragment_from_exchanges(exch_gen, parent=parent, term_dict=self._terms,
-                                                    include_elementary=True)
+                                                    include_elementary=include_elementary,
+                                                    auto_anchor=auto_anchor)
 
         fproc['StageName'] = sheetname
         for k, v in kwargs.items():

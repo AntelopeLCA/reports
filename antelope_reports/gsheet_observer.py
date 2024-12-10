@@ -153,7 +153,7 @@ class GSheetObserver(GoogleSheetReader):
     @property
     def spanners(self):
         """
-        Generates spanners by entry in
+        Generates spanners by entry in 'spanners'
         :return:
         """
         spanners_meta = self.sheet_by_name('spanners')

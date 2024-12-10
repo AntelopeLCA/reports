@@ -4,6 +4,7 @@ from antelope_foreground.terminations import FlowConversionError
 
 from .quick_and_easy import QuickAndEasy, AmbiguousResult
 from .float_conv import to_float, try_float
+from .headers import PRODUCTION_HEADER
 import logging
 from collections import defaultdict
 
@@ -390,7 +391,7 @@ class ModelMaker(QuickAndEasy):
         except InvalidDirection:
             if hasattr(rx, 'direction'):
                 child_direction = comp_dir(rx.direction)
-            elif hasattr(rx, 'sense'):
+            elif hasattr(rx, 'sense') and rx.sense is not None:
                 child_direction = comp_dir(rx.sense)
             else:
                 child_direction = parent.direction
@@ -445,6 +446,12 @@ class ModelMaker(QuickAndEasy):
             for flow, _tap in self._taps.items():
                 direction, term = _tap
                 self.add_tap(c, flow, direction=direction, term=term, include_zero=False)
+
+        # add residual information to child flow
+        for k in row.keys():
+            if k not in PRODUCTION_HEADER:
+                c[k] = row[k]
+
         return c
 
     def _log_e(self, ssr, e):
@@ -496,6 +503,7 @@ class ModelMaker(QuickAndEasy):
                 try:
                     parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
                     c = self._build_production_row(parent, row)
+                    c['_%s_row' % (prefix or sheet.name)] = ssr
                     print('== %03d ==: %s' % (ssr, c))
                     count += 1
                 except NoInformation:
@@ -566,9 +574,12 @@ class ModelMaker(QuickAndEasy):
 
         sheet = self.xlsx[sheetname]
         row = sheet.row_dict(ssr - 1)
+        if not row.get('prod_flow'):
+            raise ValueError('Empty prod_flow')
 
         # update parent
-        parent = self.create_or_retrieve_reference(row['prod_flow'], prefix=prefix)
+        dirn = row.get('ref_direction', 'Output') or 'Output'
+        parent = self.create_or_retrieve_reference(row['prod_flow'], direction=dirn, prefix=prefix)
         rv = try_float(row['ref_value'])
         ru = row.get('ref_unit')
         self.fg.observe(parent, exchange_value=rv, units=ru)
@@ -576,9 +587,11 @@ class ModelMaker(QuickAndEasy):
         # build child
         c = self._build_production_row(parent, row)
         print('== %03d ==: %s' % (ssr, c))
+        c['_%s_row' % (prefix or sheet.name)] = ssr
         if ssr in self._errors:
             print('removing error for row %d' % ssr)
             self._errors.pop(ssr)
+        return c
 
     def _check_alpha_beta_prod(self, node, row_dict):
         """

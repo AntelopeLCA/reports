@@ -63,7 +63,7 @@ def random_color(seed, sat=0.65, val=0.95, offset=14669):
     return colorsys.hsv_to_rgb(hue, sat, val)
 
 
-def grab_stages(*results, sort=None):
+def grab_stages(*results, sort=None, count=None):
     stages = set()
 
     def _first_score(_comp):
@@ -76,9 +76,12 @@ def grab_stages(*results, sort=None):
     for i in results:
         stages = stages.union(i.keys())
     if sort is None:
-        return sorted(stages, key=_first_score, reverse=True)
+        out = sorted(stages, key=_first_score, reverse=True)
     else:
-        return sorted(stages, key=sort)
+        out = sorted(stages, key=sort)
+    if count is None:
+        return out
+    return out[:count]
 
 
 def grab_names(*results, field=None, default='Other'):
@@ -225,7 +228,7 @@ class WaterfallChart(object):
 
             self._ax[self._qs[i]] = ax
 
-    def __init__(self, *results, stages=None, color=None, color_dict=None,
+    def __init__(self, *results, stages=None, count=None, color=None, color_dict=None,
                  style=None, style_dict=None, stage_property=None, stage_default='Other',
                  include_net=True, net_name='remainder', data_free=False,
                  filename=None, size=6, autorange=False, font_size=None,
@@ -248,6 +251,7 @@ class WaterfallChart(object):
         :param results: positional parameters must all be LciaResult objects having the same quantity
         :param stages: an ordering of stages. use grab_stages(*results) to get a complete list, then permute it.
         (default ordering is by score of the first quantity, decreasing)
+        :param count: [None] limit to the first <count> stages
 
         :param color: color to use for all bars
         :param color_dict: dictionary of stage name to color for specific stages
@@ -312,12 +316,12 @@ class WaterfallChart(object):
         # group stages by case
         labels = []
         if stages is None:
-            stages = {case: grab_stages(*ress) for case, ress in self._res_by_case.items()}
+            stages = {case: grab_stages(*ress, count=count) for case, ress in self._res_by_case.items()}
             self._names = grab_names(*results, field=stage_property, default=stage_default)
 
         else:
             # I have no idea what's going on here
-            stages = {case: list(filter(lambda x: x in grab_stages(*ress), stages))
+            stages = {case: list(filter(lambda x: x in grab_stages(*ress, count=count), stages))
                       for case, ress in self._res_by_case.items()}
             self._names = None
 

@@ -1,3 +1,5 @@
+import pandas as pd
+
 from .components_mixin import ComponentsMixin
 from .lca_model_runner import LcaModelRunner
 
@@ -107,9 +109,22 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self._params[case] = self._scenario_tuple(params)
         self._recalculate_case(case)
 
+    def fragment_flows(self, scenario):
+        return self._traversals[scenario]
+
     def cutoffs(self, scenario, **kwargs):
         ios, _ = group_ios(self._model, self._traversals[scenario], **kwargs)
         return ios_exchanges(ios, ref=self._model)
+
+    def cutoffs_dataframe(self, include_activity=True):
+        def _cutoffs_row(k, sc):
+            return {'Case': sc, 'Cutoff': k.flow.name, 'Direction': k.direction, 'Magnitude': k.value,
+                    'Unit': k.unit}
+        if include_activity:
+            return pd.DataFrame([_cutoffs_row(k, s) for s in self.scenarios for k in self.cutoffs(s)])
+        else:
+            return pd.DataFrame([_cutoffs_row(k, s) for s in self.scenarios for k in self.cutoffs(s)
+                                 if k.unit != 'activity'])
 
     def activity(self, scenario):
         """

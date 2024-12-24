@@ -15,3 +15,19 @@ def get_stage_name(_ff):
         if sn:
             return sn
     return 'undefined'
+
+
+def get_top_level_flow(_ff, arg='Name', default='', tops=()):
+    """
+    Returns the name of the topmost child flow whose parent is either the study model or in the list of tops
+    :param _ff:
+    :param arg:
+    :param default:
+    :param tops: set/tuple/etc of fragments whose child flows should be named
+    :return:
+    """
+    if _ff.superfragment and _ff.superfragment.fragment.top() not in tops:
+        return get_top_level_flow(_ff.superfragment, arg=arg, default=default)
+    elif _ff.superfragment is None:
+        return _ff.fragment.get(arg, default)
+    return _ff.superfragment.fragment.get(arg, default)

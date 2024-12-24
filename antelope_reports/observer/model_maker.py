@@ -192,7 +192,10 @@ class ModelMaker(QuickAndEasy):
             if the_name is None:
                 the_name = ext_ref
             if ref_quantity is None:
-                ref_q = self._unit_map.get(row.get(ref_unit), 'Items')
+                ref_q = self._unit_map.get(row.get(ref_unit))
+                if ref_q is None:
+                    print('%s:%d Unrecognized unit %s- skipping flow %s' % (sheetname, ssr, row.get(ref_unit), ext_ref))
+                    continue
             else:
                 ref_q = row.get(ref_quantity)
             count += 1

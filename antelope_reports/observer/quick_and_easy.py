@@ -493,6 +493,10 @@ class QuickAndEasy(object):
         :return:
         """
         sheet = self.xlsx[sheetname]
+        if sheet.nrows <= 1:
+            print('No exchanges')
+            return
+
         if prefix:
             ref = '%s_%s' % (prefix, sheetname)
         else:

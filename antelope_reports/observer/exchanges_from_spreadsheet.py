@@ -163,14 +163,10 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
         proc_ref = CatalogRef(origin, sheetlike.name, entity_type='process')
     else:
         proc_ref = node
-    ref_flow = _row_dict(sheetlike, 1)
-    flow_ref, dirn, value, units, term = _exchange_params(origin, ref_flow)
-    if term is not None:
-        raise ValueError('(%s) Reference flow cannot have specified termination: %s' % (sheetlike.name, term))
-    # reference flow is unterminated
-    yield ExchangeRef(proc_ref, flow_ref, dirn, value=value, unit=units, is_reference=True, **ref_flow)
 
-    for row in range(2, sheetlike.nrows):
+    _yield_ref_next = True
+
+    for row in range(1, sheetlike.nrows):
         c_flow = _row_dict(sheetlike, row)
         if len(c_flow) == 0:
             continue
@@ -186,8 +182,17 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
             print('==Row %02d== SKIP  invalid direction %s' % (row+1, e.args))
             continue
 
-        if value is ValueIsBalance:
-            c_flow['balance'] = True
-            value = 0.0
+        if _yield_ref_next:
+            # ref flow is first nonempty record
+            if term is not None:
+                raise ValueError('(%s) Reference flow cannot have specified termination: %s' % (sheetlike.name, term))
+            # reference flow is unterminated
+            yield ExchangeRef(proc_ref, flow_ref, dirn, value=value, unit=units, is_reference=True, **c_flow)
+            _yield_ref_next = False
+        else:
 
-        yield ExchangeRef(proc_ref, flow_ref, dirn, value=value, unit=units, termination=term, **c_flow)
+            if value is ValueIsBalance:
+                c_flow['balance'] = True
+                value = 0.0
+
+            yield ExchangeRef(proc_ref, flow_ref, dirn, value=value, unit=units, termination=term, **c_flow)

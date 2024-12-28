@@ -109,12 +109,12 @@ class AllocationEngine(object):
 
         :param product_flow:
         :param direction: of product w.r.t allocated activity [default 'Output']
-        :param external_ref: default: '[product_flow.external_ref]_alloc_[alloc_flow.external_ref]
+        :param external_ref: default: '[allocator.external_ref]_alloc_[product_flow.external_ref]
         :param cap_activity: [True] conceal the allocator's activity share
         :return:
         """
         if external_ref is None:
-            external_ref = '%s_alloc_%s' % (product_flow.external_ref, self.alloc_flow.external_ref)
+            external_ref = '%s_alloc_%s' % (self.allocator.external_ref, product_flow.external_ref)
         if self._fg[external_ref] is None:
             capsule = self._fg.new_fragment(flow=product_flow, direction=direction, exchange_value=1.0,
                                             external_ref=external_ref)

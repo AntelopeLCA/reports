@@ -211,6 +211,13 @@ class ModelMaker(QuickAndEasy):
 
         print('Reviewed %d flows (%d new added)' % (count, len(new)))
 
+    def detect_spanner_flows(self, spanner_ref, **kwargs):
+        self.autodetect_flows(spanner_ref, external_ref='flow', name='Name', ref_unit='units',
+                              context='context', **kwargs)
+
+    def detect_production_flows(self, production_sheet='production', **kwargs):
+        self.autodetect_flows(production_sheet, external_ref='prod_flow', ref_unit='ref_unit', **kwargs)
+
     def update_flows(self, sheetname='flows'):
         """
         here we are using the same flows sheet spec as XlsxArchiveUpdater so we don't need to configure column mappings

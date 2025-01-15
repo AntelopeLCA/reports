@@ -1,11 +1,15 @@
 from antelope import EntityNotFound
 
-from .lc_mfa_study import NestedLcaStudy
+from .observed_mfa_study import ObservedMfaStudy
 
-from mfatools.aggregation.conventions import logistics_fragment_ref
+# from mfatools.aggregation.conventions import logistics_fragment_ref
 
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Optional
 from pydantic import BaseModel
+
+
+def logistics_fragment_ref(fragment):
+    return '%s_inbound_logistics' % fragment.external_ref
 
 
 class DynamicUnitSpec(BaseModel):
@@ -23,10 +27,9 @@ class ParentlessKnob(Exception):
     pass
 
 
-class DynamicUnitLcaStudy(NestedLcaStudy):
+class DynamicUnitLcaStudy(ObservedMfaStudy):
     """
-    This subclass adds all the build-out machinery that is specific to the CATRA study-- that means:
-     1- the Dynamic Unit, which is dynamically specified
+    This subclass takes the observed study machinery (to specify routes) adds the Dynamic Unit, which is like a synthetic MFA observation
      2-
     """
     @property
@@ -43,6 +46,17 @@ class DynamicUnitLcaStudy(NestedLcaStudy):
             return self._fg['unit_logistics']
         else:
             raise EntityNotFound('unit_logistics')
+
+    def make_logistics_mappings(self, logistics_mappings, add_knob=True):
+        for k, v in logistics_mappings.items():
+            t, stage = v
+            cf = self.make_study_mapping(self.logistics_container, k, 'Input', t, stage=stage)
+            if add_knob:
+                # also add a logistics knob to the unit logistics model-- we could do this in general....
+                knob = cf.flow.name
+                knob = knob.translate(str.maketrans('/ ()', '--__'))
+                print('doing unit logs %s' % knob)
+                self._add_unit_knob(knob, cf.flow, 'Input', self.unit_logistics, descend=False)
 
     @property
     def dynamic_unit(self):

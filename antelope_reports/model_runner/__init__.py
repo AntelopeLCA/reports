@@ -3,6 +3,8 @@ from .scenario_runner import ScenarioRunner
 from .sens_runner import SensitivityRunner
 from .results_writer import ResultsWriter
 
+import pandas as pd
+
 
 def get_stage_name(_ff):
     try:
@@ -31,3 +33,21 @@ def get_top_level_flow(_ff, arg='Name', default='', tops=()):
     elif _ff.superfragment is None:
         return _ff.fragment.get(arg, default)
     return _ff.superfragment.fragment.get(arg, default)
+
+
+def lcias_to_dataframe(*ress, key=None):
+    """
+    Concatenate a set of LCIA results into a dataframe, quantities in column x components in row,
+    using c.name
+    :param ress:
+    :param key: executable name extractor for *component* (not entity) (default getattr(c, 'name'))
+    :return:
+    """
+    if key is None:
+        key = lambda x: getattr(x, 'name')
+
+    def _single_qty(r):
+        return pd.DataFrame(((key(c), c.cumulative_result * 100 / r.total()) for c in r.components()),
+                            columns=('Stage', r.quantity['indicator'])).set_index('Stage')
+
+    return pd.concat((_single_qty(k) for k in ress), axis=1)

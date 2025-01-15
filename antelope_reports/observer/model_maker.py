@@ -311,6 +311,7 @@ class ModelMaker(QuickAndEasy):
             flow = self.fg[flow_or_ref]
             if flow is None:
                 flow = self.fg.get(flow_or_ref)  # raises EntityNotFound eventually
+                # yes, this is (regrettably) opposite the convention where .get() returns None
                 # raise EntityNotFound(flow_or_ref)
 
             try:
@@ -419,6 +420,9 @@ class ModelMaker(QuickAndEasy):
                         raise ConsistencyError
                 else:
                     c.set_balance_flow()
+            else:
+                if parent.balance_flow is c:
+                    c.unset_balance_flow()
         except StopIteration:
             if balance:
                 if parent.balance_flow:

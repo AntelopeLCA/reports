@@ -185,7 +185,7 @@ def exchanges_from_spreadsheet(sheetlike, term_dict=None, node=None, origin=None
         if _yield_ref_next:
             # ref flow is first nonempty record
             if term is not None:
-                raise ValueError('(%s) Reference flow cannot have specified termination: %s' % (sheetlike.name, term))
+                print('Note: (%s) Reference flow cannot have specified termination: %s' % (sheetlike.name, term))
             # reference flow is unterminated
             yield ExchangeRef(proc_ref, flow_ref, dirn, value=value, unit=units, is_reference=True, **c_flow)
             _yield_ref_next = False

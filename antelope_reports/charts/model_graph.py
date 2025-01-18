@@ -1,5 +1,6 @@
 import pydot
 from antelope import check_direction
+from antelope_core.autorange import AutoRange
 from math import log10
 
 
@@ -32,21 +33,25 @@ class ModelGraph(object):
         else:
             shape = {'Output': 'rarrow',
                      'Input': 'larrow'}[check_direction(frag.direction)]
-            if bool(self._values):
+            if bool(self.values):
                 ev = frag.exchange_value(self._scenario or True)
-                if ev == 0:
-                    m = 2  # we just want a '0.0'
+                if bool(self.autoscale):
+                    au = AutoRange(abs(ev))
+                    label = '%.3g %s' % (au.adjust(ev), au.adj_unit(frag.flow.unit))
                 else:
-                    m = log10(abs(ev))
-                if abs(m) <= 3:
-                    if m > 1:
-                        label = '%.1f %s' % (ev, frag.flow.unit)
-                    elif m > -1:
-                        label = '%.2f %s' % (ev, frag.flow.unit)
+                    if ev == 0:
+                        m = 2  # we just want a '0.0'
                     else:
-                        label = '%.3f %s' % (ev, frag.flow.unit)
-                else:
-                    label = '%.3g %s' % (ev, frag.flow.unit)
+                        m = log10(abs(ev))
+                    if abs(m) <= 3:
+                        if m > 1:
+                            label = '%.1f %s' % (ev, frag.flow.unit)
+                        elif m > -1:
+                            label = '%.2f %s' % (ev, frag.flow.unit)
+                        else:
+                            label = '%.3f %s' % (ev, frag.flow.unit)
+                    else:
+                        label = '%.3g %s' % (ev, frag.flow.unit)
             else:
                 label = frag.flow.unit
             _d = pydot.Node(frag.uuid[:10] + '_f', shape=shape, label=label)
@@ -54,6 +59,7 @@ class ModelGraph(object):
         return _d
 
     def __init__(self, model, scenario=None, values=True, group='StageName', rankdir="RL", descend=False, text_width=25,
+                 autoscale=None,
                  focus=True,
                  **kwargs):
         """
@@ -63,7 +69,8 @@ class ModelGraph(object):
         """
         self._model = model.top()
         self._scenario = scenario
-        self._values = values
+        self.values = values
+        self.autoscale=autoscale
 
         self._text_width = int(text_width)
         self._group = group

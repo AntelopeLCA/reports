@@ -9,6 +9,7 @@ from .observations_from_spreadsheet import ObservationsFromSpreadsheet
 from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
+import logging
 
 tr = str.maketrans(' ', '_', ',[]()*&^%$#@/\\')
 
@@ -277,7 +278,7 @@ class QuickAndEasy(object):
 
         return frag
 
-    # this is from a misbegotten demo
+    # this is from the misbegotten demo
     def new_link(self, flow_name, ref_quantity, direction, amount=None, units=None, flow_ref=None, parent=None, name=None,
                  stage=None,
                  prefix='frag',
@@ -308,7 +309,9 @@ class QuickAndEasy(object):
         if flow_ref is None:
             flow_ref = _flow_to_ref(flow_name)
 
-        flow = self.fg.add_or_retrieve(flow_ref, ref_quantity, flow_name)
+        rq = self.fg.get_canonical(ref_quantity)
+
+        flow = self.fg.add_or_retrieve(flow_ref, rq, flow_name)
 
         external_ref = name or None
         if parent is None:
@@ -323,6 +326,7 @@ class QuickAndEasy(object):
         else:
             if direction == 'balance':
                 balance = True
+                direction = 'Input'  # WLOG
             if balance:
                 frag = self.fg.new_fragment(flow, direction, parent=parent, balance=True)
             else:
@@ -414,6 +418,9 @@ class QuickAndEasy(object):
         :param kwargs: passed to new fragment creation
         :return:
         """
+        if parent.termination(scenario).is_fg and parent.balance_flow:
+            parent = parent.balance_flow
+
         t = parent.termination(scenario)
         _is_ecoinvent = bool(t.term_node.origin.find('ecoinvent') >= 0)
 
@@ -426,7 +433,7 @@ class QuickAndEasy(object):
 
         if ev == 0:
             if not include_zero:
-                print('Child child_flow returned 0 exchange', parent, child_flow)
+                logging.info('Child child_flow returned 0 exchange', parent, child_flow)
                 return None
 
         # tri-state logic
@@ -472,11 +479,15 @@ class QuickAndEasy(object):
             except (KeyError, AmbiguousResult) as e:
                 print('Loading tap from row %d: %s (%s) - skipping' % (r+1, e.__class__.__name__, e.args[0]))
                 continue
-            tgt_origin = row.get('target_origin', 'here')
-            if tgt_origin == 'here':
-                tgt = self.fg.get(row['target_ref'])
+            tgt_ref = row.get('target_ref')
+            if tgt_ref is None:
+                tgt = NullContext
             else:
-                tgt = self.fg.cascade(tgt_origin).get(row['target_ref'])
+                tgt_origin = row.get('target_origin', 'here')
+                if tgt_origin == 'here':
+                    tgt = self.fg.get(row['target_ref'])
+                else:
+                    tgt = self.fg.cascade(tgt_origin).get(row['target_ref'])
             direction = row.get('direction', 'Input')
 
             self.store_tap_recipe(flow, direction, tgt)

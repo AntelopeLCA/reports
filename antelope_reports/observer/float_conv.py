@@ -26,7 +26,7 @@ def to_float(thing):
     try:
         return try_float(thing)
     except ValueError:
-        logging.warning('float value error %s - using 0.0' % thing)
+        logging.warning('float value error "%s" - using 0.0' % thing)
         return 0.0
     except TypeError:
         logging.warning('float type error %s (%s) - using 0.0' % (thing, type(thing)))

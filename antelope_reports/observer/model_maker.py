@@ -444,11 +444,22 @@ class ModelMaker(QuickAndEasy):
             if row.get('amount_lo', None) is not None:
                 ev_hi = to_float(row['amount_hi'])
                 self.fg.observe(c, exchange_value=ev_hi, units=row['units'], scenario=self.sens_hi)
+        """
+        Logic here:
+        if descend is specified, set it
+        else: 
+        if no stage name is specified, descend should be True
+        """
+        descend = row.get('descend')
         if row.get('stage_name'):
             c['StageName'] = row['stage_name']
-            descend = False
+            if descend is None:
+                descend = False
         else:
-            descend = True
+            if descend is None:
+                descend = True
+            else:
+                descend = bool(descend)
         c.terminate(rx, descend=descend)
 
         if row.get('note'):
@@ -549,7 +560,7 @@ class ModelMaker(QuickAndEasy):
                     print('## %03d ##: flow-conversion termination error %s' % (ssr, e.args))
         return count
 
-    def make_production(self, sheetname='production', prefix='prod'):
+    def make_production(self, sheetname='production', prefix='prod', taps=None):
         """
         Strategy here:
 
@@ -560,6 +571,7 @@ class ModelMaker(QuickAndEasy):
         :param self:
         :param sheetname: default 'production'
         :param prefix: prepend to flow_ref to get frag_ref
+        :param taps: [None] if present, load taps from, named sheet after creating references but before child flows
         :return:
         """
         if self.xlsx is None:
@@ -570,6 +582,9 @@ class ModelMaker(QuickAndEasy):
 
         # first pass: create all production fragments
         refs = self._make_production_references(sheet, prefix)
+
+        if taps:
+            self.load_taps_from_spreadsheet(taps)
 
         # second pass: create child flows
         count = self._make_production_childflows(sheet, prefix)

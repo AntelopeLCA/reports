@@ -66,7 +66,7 @@ SPANNER_HEADER = ('flow', 'direction', 'Name', 'amount', 'units', 'amount_hi', '
 
 PRODUCTION_HEADER = ('prod_flow', 'ref_direction', 'ref_value', 'ref_unit',
                      'direction', 'balance_yn', 'child_flow', 'units', 'amount', 'amount_hi', 'amount_lo',
-                     'stage_name',
+                     'descend', 'stage_name',
                      'target_origin', 'target_flow', 'target_name', 'target_ref', 'locale',
                      'add_taps', 'note', 'Name', 'Comment', 'compartment')
 
@@ -93,6 +93,7 @@ WIDTHS = {
                    'child_flow': 170,
                    'direction': 69,
                    'units': 69,
+                   'descend': 65,
                    'amount': 75,
                    'amount_hi': 75,
                    'amount_lo': 75

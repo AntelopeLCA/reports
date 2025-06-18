@@ -137,7 +137,7 @@ class ObservationsFromSpreadsheet(object):
             if act is None:
                 self._errmesg(ssr, 'Activity %s not found' % row['activity'])
                 continue
-            if row['child_flow']:
+            if row.get('child_flow'):
                 if row['child_flow'] == '*':
                     obj = [cf for cf in act.child_flows]
                     p = row.pop('parameter', None)

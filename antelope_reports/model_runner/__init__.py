@@ -19,6 +19,31 @@ def get_stage_name(_ff):
     return 'undefined'
 
 
+def get_child_property(_ff, property_name, default=None, concat=None):
+    """
+    Utility function to retrieve a given property name from inside a fragment flow's anchor
+    :param _ff:
+    :param property_name:
+    :param default:
+    :param concat:
+    :return:
+    """
+    if _ff.term.is_context:
+        return _ff.term.term_node.name
+    g = _ff.term.term_node.get(property_name)
+    if g is not None and g != '':
+        return g
+    if hasattr(_ff.term.term_node, 'child_flows'):
+        gs = list(filter(None, (f.get(property_name) for f in _ff.term.term_node.child_flows)))
+        if len(gs) > 0:
+            if concat:
+                return concat.join(gs)
+            else:
+                return gs[0]
+        else:
+            return default
+
+
 def get_top_level_flow(_ff, arg='Name', default='', tops=()):
     """
     Returns the name of the topmost child flow whose parent is either the study model or in the list of tops

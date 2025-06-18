@@ -41,7 +41,7 @@ def compare_exchanges(s1, s2):
     Returns two sets: those present only in s1, those present only in s2
     :param s1:
     :param s2:
-    :return:
+    :return: distinct exchanges in s1, distinct exchanges in s2. sum of lengths is 0 indicates success
     """
     set1 = {_exch_key(s) for s in s1}
     set2 = {_exch_key(s) for s in s2}
@@ -64,7 +64,8 @@ def compare_exchange_values(s1, s2, rel_tol=1e-6):
     :param s1:
     :param s2:
     :param rel_tol: default 1e-6
-    :return: a list of failed exchanges, expressed as 2-tuples: (bad_exch, good_val) or (bad_exch, None)
+    :return: a list of failed exchanges, expressed as 2-tuples: (bad_exch, good_val) or (bad_exch, None). 0-length
+     return set indicates success
     """
     c = {_exch_key(x): x.value for x in s1}
     fail = []

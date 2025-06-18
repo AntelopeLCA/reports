@@ -138,7 +138,7 @@ class GSheetObserver(GoogleSheetReader):
         for k in ('quantities', 'flows', 'flowproperties', 'production', 'observations', 'taps', 'spanners'):
             if k not in self._sheetnames:
                 # only create the sheet if it doesn't already exist
-                self._create_and_format_sheet_by_recipe('production', sheet_name=k)
+                self._create_and_format_sheet_by_recipe(k)
 
                 if k == 'production':
                     self._production_sheet_config(k)
@@ -146,7 +146,7 @@ class GSheetObserver(GoogleSheetReader):
     def new_production_sheet(self, sheet_name='production'):
         if sheet_name not in self._sheetnames:
             # only create the sheet if it doesn't already exist
-            self._create_and_format_sheet_by_recipe(sheet_name)
+            self._create_and_format_sheet_by_recipe('production', sheet_name=sheet_name)
 
         self._production_sheet_config(sheet_name)
 

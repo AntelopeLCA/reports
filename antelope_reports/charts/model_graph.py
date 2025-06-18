@@ -35,8 +35,8 @@ class ModelGraph(object):
                      'Input': 'larrow'}[check_direction(frag.direction)]
             if bool(self.values):
                 ev = frag.exchange_value(self._scenario or True)
-                if bool(self.autoscale):
-                    au = AutoRange(abs(ev))
+                if bool(self.autoscale) and frag.flow.unit != 'Item(s)':
+                    au = AutoRange(abs(ev), bias=-0.01)
                     label = '%.3g %s' % (au.adjust(ev), au.adj_unit(frag.flow.unit))
                 else:
                     if ev == 0:
@@ -70,20 +70,52 @@ class ModelGraph(object):
         self._model = model.top()
         self._scenario = scenario
         self.values = values
-        self.autoscale=autoscale
+        self.autoscale = autoscale
 
         self._text_width = int(text_width)
         self._group = group
         self._descend = descend
 
         self._graph = pydot.Dot(model.name, graph_type='digraph', strict=True, rankdir=rankdir, **kwargs)
-        self._refflow = pydot.Node("ref flow", shape='none', height=0.25, label=model.flow.name)
+        self._refflow = pydot.Node("ref flow", shape='none', height=0.25, label=model.flow['name'])
         self._graph.add_node(self._refflow)
         self.anchor(self._model, self._refflow, first=True)
 
     @property
     def graph(self):
         return self._graph
+
+    @staticmethod
+    def display():
+        """
+        To display a model graph from an ipython shell, run the following:
+
+        from IPython.display import Image, display
+
+        %matplotlib inline  # add if using jupyter
+
+        def view_pydot(pdot):
+            plt = Image(pdot.graph.create_png())
+            display(plt)
+
+        view_pydot(mg.graph)
+
+        where mg is a ModelGraph instance.
+        :return:
+        """
+        msg = '''\
+# To display a model graph in a jupyter notebook environment, run the following
+from IPython.display import Image, display
+
+%matplotlib inline  # add if using jupyter
+
+def view_pydot(pdot):
+    plt = Image(pdot.graph.create_png())
+    display(plt)
+            
+view_pydot(mg.graph)  # mg is a ModelGraph instance
+'''
+        print(msg)
 
     def get_group(self, frag):
         if self._group is None:
@@ -99,7 +131,7 @@ class ModelGraph(object):
         lbl = frag.uuid[:10] + '_anch'
         term = frag.termination(self._scenario)
         if term.is_null:
-            cutoff = pydot.Node(lbl, shape="none", label=frag.flow.name)
+            cutoff = pydot.Node(lbl, shape="none", label=self._flowtext(frag.flow.name))
             self._graph.add_node(cutoff)
             self._graph.add_edge(pydot.Edge(cutoff, _d, arrowsize=0, minlen=1.3))
             return cutoff
@@ -126,7 +158,7 @@ class ModelGraph(object):
         elif term.is_context:
             cx = pydot.Node(lbl, shape="box", style="dotted", height=0.25, label=self._flowtext(term.term_node.name))
             self._graph.add_node(cx)
-            self._graph.add_edge(pydot.Edge(cx, _d, arrowsize=0))
+            self._graph.add_edge(pydot.Edge(cx, _d, arrowsize=0, label=term.term_flow['name']))
             return cx
 
         elif term.is_process:

@@ -1,3 +1,4 @@
+from .charts import ModelGraph
 from .observer import QuickAndEasy, MissingValue
 
 from time import time

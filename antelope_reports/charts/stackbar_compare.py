@@ -14,10 +14,11 @@ import pandas as pd
 import numpy as np
 from matplotlib.cm import get_cmap
 from matplotlib import pyplot as plt
+from math import ceil
 
 
 def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, stage_colors=None, colormap='viridis',
-                            cmap_factor=1.0, wspace=0.3):
+                            cmap_factor=1.0, wspace=0.3, nrows=1):
     # Pivot data to calculate stacked bar components
     # we want to preserve the order in the dataframe
     if _qs is None:
@@ -48,19 +49,30 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
         stage_colors = {stage: _cm(i / len(stages) / cmap_factor) for i, stage in enumerate(stages)}
 
     # Create the figure with multiple axes
-    fig, axes = plt.subplots(1, len(quantities), figsize=(5 * len(quantities), 6), sharey=False)
+    # first, handle the subplot geometry
+    n = min([nrows, len(quantities)])
+    c = ceil(len(quantities) / n)
+
+    fig, axes = plt.subplots(n, c, figsize=(5 * c, 6 * n), sharey=False, sharex=True)
+    ax_legend = axes[0][-1]
     plt.subplots_adjust(wspace=wspace)
 
     if len(quantities) == 1:
-        axes = [axes]  # Ensure axes is iterable if only one plot
+        axes = [[axes]]  # Ensure axes is 2d array if only one plot
+    else:
+        axes = axes.reshape(1, n*c)  # this always returns a 2d array
+
+    for ax in axes[0]:
+        ax.set_axis_off()  # turn them all off
 
     # Loop through indicators to create subplots
-    for ax, quantity, unit in zip(axes, quantities, units):
+    for ax, quantity, unit in zip(axes[0], quantities, units):
         # Filter data for this indicator
         indicator_data = pivot_df.loc[quantity]
+        ax.set_axis_on()  # turn on when it's being used
 
         # Compute cumulative sums for stacking
-        cumulative_sums = indicator_data.cumsum(axis=1)
+        cumulative_sums = indicator_data.cumsum(axis=1).fillna(0)
         bar_positions = np.arange(len(cases))  # X positions for bars
 
         # Plot stacked bars
@@ -72,12 +84,12 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
 
         # Customize the axes
         ax.set_title(f"{f_u}: {quantity}")
-        ax.set_xlabel("Truck Type")
+        ax.set_xlabel(None)
         ax.set_ylabel(unit)
         ax.set_xlim([bar_positions[0] - 0.5, bar_positions[-1] + 0.5])
         ax.set_xticks(bar_positions)
         ax.set_xticklabels(cases, rotation=45)
-        if ax is axes[-1]:
+        if ax is ax_legend:
             ax.legend(title="Stage", loc='upper left', bbox_to_anchor=(1, 1))
 
     # Set common y-label

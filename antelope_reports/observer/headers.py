@@ -70,7 +70,8 @@ PRODUCTION_HEADER = ('prod_flow', 'ref_direction', 'ref_value', 'ref_unit',
                      'target_origin', 'target_flow', 'target_name', 'target_ref', 'locale',
                      'add_taps', 'note', 'Name', 'Comment', 'compartment')
 
-TAPS_HEADER = ('flow_origin', 'flow_name_or_ref', 'direction', 'target_origin', 'target_ref')
+TAPS_HEADER = ('tap_recipe', 'flow_origin', 'flow_name_or_ref', 'direction', 'target_origin', 'target_ref', 
+               'adjust_value', 'scale_value')
 
 OBSERVATIONS_HEADER = ('activity', 'child_flow', 'scenario', 'parameter', 'units',
                        'anchor_origin', 'anchor', 'anchor_flow', 'descend', 'comment')

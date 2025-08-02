@@ -23,11 +23,11 @@ classifiers = [
 ]
 dependencies = [
     "antelope-foreground >= 0.3.3",
-    "antelope-core > 0.3.3",
+    "antelope-core >= 0.3.3",
     "synonym-dict >= 0.2.4",
     "pandas",
     "matplotlib",
     "pydot >= 2.0.0"
 ]
-version = "0.2.0"
+version = "0.2.1"
 urls = {Repository = "https://github.com/AntelopeLCA/reports"}

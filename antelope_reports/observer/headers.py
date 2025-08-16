@@ -71,7 +71,7 @@ PRODUCTION_HEADER = ('prod_flow', 'ref_direction', 'ref_value', 'ref_unit',
                      'add_taps', 'note', 'Name', 'Comment', 'compartment')
 
 TAPS_HEADER = ('tap_recipe', 'flow_origin', 'flow_name_or_ref', 'direction', 'target_origin', 'target_ref', 
-               'adjust_value', 'scale_value')
+               'adjust_value', 'scale_value', 'value_units')
 
 OBSERVATIONS_HEADER = ('activity', 'child_flow', 'scenario', 'parameter', 'units',
                        'anchor_origin', 'anchor', 'anchor_flow', 'descend', 'comment')
@@ -109,6 +109,7 @@ WIDTHS = {
     'observations': {'activity': 220,
                      'child_flow': 220,
                      'units': 69},
+    'taps': {'tap_recipe': 200},
     'spanners': {'external_ref': 150,
                  'name': 220,
                  'author': 160},

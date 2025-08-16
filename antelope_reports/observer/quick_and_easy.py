@@ -10,6 +10,7 @@ from .exchanges_from_spreadsheet import exchanges_from_spreadsheet
 
 import re
 import logging
+from collections import defaultdict
 
 tr = str.maketrans(' ', '_', ',[]()*&^%$#@/\\')
 
@@ -35,6 +36,47 @@ def _flow_to_ref(name):
     else:
         fl = 'flow_' + n
     return fl
+
+
+class TapSpecError(Exception):
+    pass
+
+
+class TapSpec:
+    def __init__(self, child_flow, child_direction, target, term_flow=None,
+                 adjust_value=None, scale_value=None, value_units=None, **kwargs):
+        """
+
+        :param child_flow:
+        :param child_direction:
+        :param target:
+        :param adjust_value:
+        :param scale_value:
+        :param value_units:
+        """
+        self.child_flow = child_flow
+        self.child_direction = child_direction
+        if adjust_value is not None and scale_value is not None:
+            print('ignoring adjust_value in favor of scale_value')
+            adjust_value = None
+        if scale_value is not None and value_units is not None:
+            print('ignoring value_units for scale_value')
+            value_units = None
+
+        self.target = target
+        self.term_flow = term_flow
+        self.adjust_value = adjust_value
+        self.scale_value = scale_value
+        self.value_units = value_units
+        self.args = kwargs
+
+    @property
+    def key(self):
+        """
+        A tap can only be uniquely defined by its flow and direction
+        :return:
+        """
+        return self.child_flow, self.child_direction
 
 
 class QuickAndEasy(object):
@@ -148,7 +190,7 @@ class QuickAndEasy(object):
         self.set_terms(terms)
         self._unit_map = dict()
         self._populate_unit_map()
-        self._taps = {}
+        self._taps = defaultdict(dict)
 
         if xlsx:
             self.xlsx = xlsx
@@ -379,7 +421,7 @@ class QuickAndEasy(object):
             z.terminate(NullContext)  # truncates
     '''
 
-    def add_tap(self, parent, child_flow, direction='Input', scenario=None, term=None, term_flow=None,
+    def add_tap(self, parent, tap_spec: TapSpec, scenario=None,
                 include_zero=False, invert_direction=None, **kwargs):
         """
         Use fragment traversal to override an exchange belonging to a terminal activity.
@@ -410,7 +452,7 @@ class QuickAndEasy(object):
         :param child_flow:
         :param direction: ['Input'] exchange direction w/r/t parent
         :param scenario:
-        :param term: what to terminate the child flow to. None = cutoff. True = to foreground. all others = as specified
+        :param tap_spec: what to terminate the child flow to. None = cutoff. True = to foreground. all others = as specified
         :param term_flow:
         :param include_zero: [False] whether to add and include child flows with observed 0 EVs
         :param invert_direction: [None] whether to toggle the direction of the child flow. Default behavior is to
@@ -424,73 +466,100 @@ class QuickAndEasy(object):
         t = parent.termination(scenario)
         _is_ecoinvent = bool(t.term_node.origin.find('ecoinvent') >= 0)
 
-        if _is_ecoinvent:
-            ev = t.term_node.exchange_relation(t.term_flow, child_flow, 'Input')
-            if direction == 'Output':
-                ev *= -1
+        if tap_spec.adjust_value is not None:
+            ev = tap_spec.adjust_value
+            ev_units = tap_spec.value_units
         else:
-            ev = t.term_node.exchange_relation(t.term_flow, child_flow, direction)
+            ev_units = None
+            if _is_ecoinvent:
+                ev = t.term_node.exchange_relation(t.term_flow, tap_spec.child_flow, 'Input')
+                if tap_spec.child_direction == 'Output':
+                    ev *= -1
+            else:
+                ev = t.term_node.exchange_relation(t.term_flow, tap_spec.child_flow, tap_spec.child_direction)
+            if tap_spec.scale_value:
+                ev *= tap_spec.scale_value
 
         if ev == 0:
             if not include_zero:
-                logging.info('Child child_flow returned 0 exchange', parent, child_flow)
+                logging.info('Child child_flow returned 0 exchange', parent, tap_spec.child_flow)
                 return None
 
         # tri-state logic
         if invert_direction is True:
-            tgt_dir = comp_dir(direction)
+            tgt_dir = comp_dir(tap_spec.child_direction)
         elif invert_direction is False:
-            tgt_dir = direction
+            tgt_dir = tap_spec.child_direction
         else:
             rv = t.term_node.reference_value(t.term_flow)
             if rv < 0:
                 print('Changing direction for inverted reference activity')
-                tgt_dir = comp_dir(direction)
+                tgt_dir = comp_dir(tap_spec.child_direction)
             else:
-                tgt_dir = direction
+                tgt_dir = tap_spec.child_direction
 
         try:
-            c = next(parent.children_with_flow(child_flow, direction=tgt_dir))
+            c = next(parent.children_with_flow(tap_spec.child_flow, direction=tgt_dir))
         except StopIteration:
-            c = self.fg.new_fragment(child_flow, tgt_dir, parent=parent, **kwargs)
-        self.fg.observe(c, exchange_value=ev, scenario=scenario)
-        if term is not None:
-            if term is True:
+            c = self.fg.new_fragment(tap_spec.child_flow, tgt_dir, parent=parent, **kwargs)
+        self.fg.observe(c, exchange_value=ev, scenario=scenario, units=ev_units)
+        if tap_spec.target is not None:
+            if tap_spec.target is True:
                 c.terminate(NullContext)
             else:
-                c.terminate(term, term_flow=term_flow, scenario=scenario)
+                c.terminate(tap_spec.target, term_flow=tap_spec.term_flow, scenario=scenario)
 
         return c
 
-    def add_tap_recipes(self, node):
-        for flow, _tap in self._taps.items():
-            direction, term = _tap
-            self.add_tap(node, flow, direction=direction, term=term, include_zero=False)
+    def apply_tap_recipes(self, node, recipe=True):
+        """
+        This should
+        :param node:
+        :param recipe:
+        :return:
+        """
+        for tap_spec in self._taps[recipe].values():
+            self.add_tap(node, tap_spec, include_zero=False)
 
-    def store_tap_recipe(self, tap_flow, tap_direction, target):
-        self._taps[tap_flow] = tap_direction, target
+    def store_tap_recipe(self, recipe, tap_spec):
+        if recipe is None:
+            recipe = True
+        self._taps[recipe][tap_spec.key] = tap_spec
 
     def load_taps_from_spreadsheet(self, sheetname='taps'):
         sheet = self.xlsx[sheetname]
         for r in range(1, sheet.nrows):
             row = sheet.row_dict(r)
+            recipe = row.pop('tap_recipe', True)
+            org = row.pop('flow_origin', None)
+            name_ref = row.pop('flow_name_or_ref', None)
+            if name_ref is None:
+                print('skipping empty tap row %d' % (r+1))
+                continue
             try:
-                flow = self.get_flow_by_name_or_ref(row['flow_origin'], row['flow_name_or_ref'], strict=True)
+                if org is None:
+                    flow = self.fg.get(name_ref)
+                else:
+                    flow = self.get_flow_by_name_or_ref(org, name_ref, strict=True)
             except (KeyError, AmbiguousResult) as e:
                 print('Loading tap from row %d: %s (%s) - skipping' % (r+1, e.__class__.__name__, e.args[0]))
                 continue
-            tgt_ref = row.get('target_ref')
+            tgt_origin = row.pop('target_origin', 'here')
+            tgt_ref = row.pop('target_ref', None)
             if tgt_ref is None:
                 tgt = NullContext
             else:
-                tgt_origin = row.get('target_origin', 'here')
-                if tgt_origin == 'here':
-                    tgt = self.fg.get(row['target_ref'])
+                if tgt_origin == 'here' or tgt_origin is None:
+                    tgt = self.fg.get(tgt_ref)
                 else:
-                    tgt = self.fg.cascade(tgt_origin).get(row['target_ref'])
-            direction = row.get('direction', 'Input')
+                    tgt = self.fg.cascade(tgt_origin).get(tgt_ref)
+            direction = row.pop('direction', 'Input')
 
-            self.store_tap_recipe(flow, direction, tgt)
+            if None in row:
+                row.pop(None)
+            tap_spec = TapSpec(flow, direction, tgt, **row)
+
+            self.store_tap_recipe(recipe, tap_spec)
 
     def load_process_model(self, sheetname, prefix=None, auto_anchor=True, include_elementary=True, **kwargs):
         """

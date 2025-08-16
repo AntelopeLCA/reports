@@ -467,10 +467,9 @@ class ModelMaker(QuickAndEasy):
         if row.get('Comment'):
             c['Comment'] = row['Comment']
 
-        if row.get('add_taps'):
-            for flow, _tap in self._taps.items():
-                direction, term = _tap
-                self.add_tap(c, flow, direction=direction, term=term, include_zero=False)
+        tap_recipe = row.get('add_taps', None)
+        if tap_recipe:
+            self.apply_tap_recipes(c, tap_recipe)
 
         # add residual information to child flow
         for k in row.keys():

@@ -29,6 +29,7 @@ class NodeUpdater:
                    'match_name',
                    'same_id',
                    'targets',
+                   'targets_match_spatial_scope',
                    'node_targets')
 
     @property
@@ -94,6 +95,15 @@ class NodeUpdater:
         """
         return self._q.targets(self.current.anchor.term_flow.external_ref, direction=self.current.node.direction)
 
+    def targets_match_spatial_scope(self):
+        """
+        Retrieve targets that match the current anchor (flow and direction), filter by current anchor's spatial scope
+        :return:
+        """
+        return filter(lambda x: x['spatialscope'] == self.current.anchor.term_node['spatialscope'],
+                      self._q.targets(self.current.anchor.term_flow.external_ref, direction=self.current.node.direction)
+                      )
+
     def node_targets(self):
         """
         Retrieve targets that match the current node (flow, disregarding direction)
@@ -147,13 +157,18 @@ class NodeUpdater:
         :return:
         """
         if n is None:
-            if len(self._candidates) > 1:
-                raise TooManyCandidates()
-            elif len(self._candidates) == 0:
-                raise NoCandidates()
-            else:
-                n = 0
-        self.pick(n)
+            if self._rx is None:
+                if self._candidates is None:
+                    self.attempt()
+                if len(self._candidates) > 1:
+                    raise TooManyCandidates()
+                elif len(self._candidates) == 0:
+                    raise NoCandidates()
+                else:
+                    n = 0
+                self.pick(n)
+        else:
+            self.pick(n)
 
         if self._branch.scenario is None:
             if apply_scenario is None:

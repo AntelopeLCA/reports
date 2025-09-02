@@ -467,6 +467,9 @@ class QuickAndEasy(object):
         _is_ecoinvent = bool(t.term_node.origin.find('ecoinvent') >= 0)
 
         if tap_spec.adjust_value is not None:
+            # override include_zero
+            include_zero = True  # if adj-value is set to 0 we obey it
+            # this is super hacky (through and through)
             ev = tap_spec.adjust_value
             ev_units = tap_spec.value_units
         else:

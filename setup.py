@@ -5,6 +5,8 @@ setup()
 """
 Version History
 
+0.2.3 - correct 2 bugs in QuickAndEasy workflow: keep zero tap values, cast descend to bool in model maker
+
 0.2.2 - quick and easy add taps by recipe; node updater add targets w filter by spatial scope
 
 0.2.1 - catch-up release for ISSST workshop

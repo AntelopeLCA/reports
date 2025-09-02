@@ -455,6 +455,8 @@ class ModelMaker(QuickAndEasy):
             c['StageName'] = row['stage_name']
             if descend is None:
                 descend = False
+            else:
+                descend = bool(descend)
         else:
             if descend is None:
                 descend = True
@@ -559,7 +561,7 @@ class ModelMaker(QuickAndEasy):
                     print('## %03d ##: flow-conversion termination error %s' % (ssr, e.args))
         return count
 
-    def make_production(self, sheetname='production', prefix='prod', taps=None):
+    def make_production(self, sheetname='production', prefix='prod', taps=None, detect_flows=True):
         """
         Strategy here:
 
@@ -576,6 +578,8 @@ class ModelMaker(QuickAndEasy):
         if self.xlsx is None:
             raise AttributeError('Please attach Google Sheet')
         self._errors = dict()  # reset errors
+        if detect_flows:
+            self.detect_production_flows(sheetname)
 
         sheet = self.xlsx[sheetname]
 

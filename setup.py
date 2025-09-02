@@ -5,6 +5,8 @@ setup()
 """
 Version History
 
+0.2.2 - quick and easy add taps by recipe; node updater add targets w filter by spatial scope
+
 0.2.1 - catch-up release for ISSST workshop
 
 0.2.0 - catch-up release for ACLCA workshop

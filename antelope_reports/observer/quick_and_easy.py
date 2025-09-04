@@ -564,7 +564,8 @@ class QuickAndEasy(object):
 
             self.store_tap_recipe(recipe, tap_spec)
 
-    def load_process_model(self, sheetname, prefix=None, auto_anchor=True, include_elementary=True, **kwargs):
+    def load_process_model(self, sheetname, prefix=None, auto_anchor=True, include_elementary=True,
+                           _sheet=None, **kwargs):
         """
 
 
@@ -575,7 +576,10 @@ class QuickAndEasy(object):
         :param kwargs: key-value pairs to assign as properties to the parent fragment
         :return:
         """
-        sheet = self.xlsx[sheetname]
+        if _sheet is None:
+            sheet = self.xlsx[sheetname]
+        else:
+            sheet = _sheet
         if sheet.nrows <= 1:
             print('No exchanges')
             return

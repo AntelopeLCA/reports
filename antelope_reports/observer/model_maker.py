@@ -210,13 +210,14 @@ class ModelMaker(QuickAndEasy):
                 f.clear_chars()
 
         print('Reviewed %d flows (%d new added)' % (count, len(new)))
+        return sheet
 
     def detect_spanner_flows(self, spanner_ref, **kwargs):
-        self.autodetect_flows(spanner_ref, external_ref='flow', name='Name', ref_unit='units',
-                              context='context', **kwargs)
+        return self.autodetect_flows(spanner_ref, external_ref='flow', name='Name', ref_unit='units',
+                                     context='context', **kwargs)
 
     def detect_production_flows(self, production_sheet='production', **kwargs):
-        self.autodetect_flows(production_sheet, external_ref='prod_flow', ref_unit='ref_unit', **kwargs)
+        return self.autodetect_flows(production_sheet, external_ref='prod_flow', ref_unit='ref_unit', **kwargs)
 
     def update_flows(self, sheetname='flows'):
         """
@@ -579,9 +580,9 @@ class ModelMaker(QuickAndEasy):
             raise AttributeError('Please attach Google Sheet')
         self._errors = dict()  # reset errors
         if detect_flows:
-            self.detect_production_flows(sheetname)
-
-        sheet = self.xlsx[sheetname]
+            sheet = self.detect_production_flows(sheetname)
+        else:
+            sheet = self.xlsx[sheetname]
 
         # first pass: create all production fragments
         refs = self._make_production_references(sheet, prefix)
@@ -624,6 +625,15 @@ class ModelMaker(QuickAndEasy):
             print('removing error for row %d' % ssr)
             self._errors.pop(ssr)
         return c
+
+    def load_process_model(self, sheetname, prefix=None, auto_anchor=True, include_elementary=True,
+                           detect_flows=True, **kwargs):
+        if detect_flows:
+            sheet = self.detect_spanner_flows(sheetname)
+        else:
+            sheet = None
+        return super(ModelMaker, self).load_process_model(sheetname, prefix=prefix, auto_anchor=auto_anchor,
+                                                          include_elementary=include_elementary, _sheet=sheet, **kwargs)
 
     def _check_alpha_beta_prod(self, node, row_dict):
         """

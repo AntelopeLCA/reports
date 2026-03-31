@@ -326,14 +326,30 @@ class QuickAndEasy(object):
                  prefix='frag',
                  balance=None):
         """
-        Just discovered that 'balance' is actually a direction
+        The new_link() function creates a new fragment link that includes three required arguments:
 
-        am I writing fragment_from_exchanges *again*? this is the API, this function right here
+         -  a flow, specified by name
+         -  a reference quantity for that flow
+         -  a direction for that flow. If the flow is a reference flow, specify the flow's direction from the node's
+         perspective ('Output' is standard). If the flow is a child flow, specify the direction with respect to the
+         parent (e.g. electricity would be an 'Input' but a co-product would be an 'Output')
 
-        NO
-        the api is fragment_from_exchange. and yes, i am writing it again.
+        If the flow is a child flow, you must specify:
 
-        The policy of this impl. is to create from scratch.  no need to re-run + correct: just scratch and throw out
+         -  parent, the node whose activity drives the flow.
+
+        The following optional parameters can also be specified:
+
+         -  amount (numeric exchange value for the flow)
+         -  units (default to the reference quantity's unit)
+         -  balance=True (tells the flow's magnitude to be calculated at traversal time by balancing the reference
+         quantity)
+         -  name (what to name the fragment, defaults to the flow name)
+         -  stage (how the fragment's impacts should be grouped in LCIA)
+
+        Only child flows can be balance flows. If you specify balance=True, it is an error to also specify an amount.
+        Note that you can also specify direction='balance' because the direction of the flow will be determined based
+        on the balance.
 
         :param flow_name:
         :param ref_quantity: of flow

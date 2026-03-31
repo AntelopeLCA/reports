@@ -54,13 +54,13 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
     c = ceil(len(quantities) / n)
 
     fig, axes = plt.subplots(n, c, figsize=(5 * c, 6 * n), sharey=False, sharex=True)
-    ax_legend = axes[0][-1]
-    plt.subplots_adjust(wspace=wspace)
-
     if len(quantities) == 1:
         axes = [[axes]]  # Ensure axes is 2d array if only one plot
-    else:
+    elif n == 1:
         axes = axes.reshape(1, n*c)  # this always returns a 2d array
+
+    ax_legend = axes[0][-1]
+    plt.subplots_adjust(wspace=wspace)
 
     for ax in axes[0]:
         ax.set_axis_off()  # turn them all off

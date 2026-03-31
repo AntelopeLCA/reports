@@ -13,7 +13,7 @@ class SimpleModelBuilder(LcaModelRunner):
         self._frags = dict()
 
     def add_case(self, name, p_ref):
-        if name in self._scenarios:
+        if name in self._cases:
             raise KeyError('Name already exists')
         frag = self._fg.create_process_model(p_ref)
         self._fg.extend_process(frag, multi_flow=True)

@@ -19,7 +19,7 @@ class MultiModelRunner(LcaModelRunner):
         """
         if name is None:
             name = frag.name
-        if name not in self._scenarios:
+        if name not in self._cases:
             self.add_scenario(name)
         self._frags[name] = frag
 
@@ -40,6 +40,6 @@ class MultiModelRunner(LcaModelRunner):
         pd = self.scenario_summary_tbl()
         pd.to_excel(xlw, sheet_name='Summary')
         if details:
-            for s in self.scenarios:
+            for s in self.cases:
                 self.scenario_detail_tbl(s).to_excel(xlw, sheet_name=s)
         xlw.save()

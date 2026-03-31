@@ -63,7 +63,7 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         self.recalculate()
 
     def traverse_all(self):
-        for case in self.scenarios:
+        for case in self.cases:
             self._traverse_case(case)
 
     def _traverse_case(self, case):
@@ -105,7 +105,7 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
             yield k
 
     def add_case(self, case, *params):
-        self.add_scenario(case)  # raises KeyError
+        super(ScenarioRunner, self).add_case(case)  # raises KeyError
         self._params[case] = self._scenario_tuple(params)
         self._recalculate_case(case)
 
@@ -121,9 +121,9 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
             return {'Case': sc, 'Cutoff': k.flow.name, 'Direction': k.direction, 'Magnitude': k.value,
                     'Unit': k.unit}
         if include_activity:
-            return pd.DataFrame([_cutoffs_row(k, s) for s in self.scenarios for k in self.cutoffs(s)])
+            return pd.DataFrame([_cutoffs_row(k, s) for s in self.cases for k in self.cutoffs(s)])
         else:
-            return pd.DataFrame([_cutoffs_row(k, s) for s in self.scenarios for k in self.cutoffs(s)
+            return pd.DataFrame([_cutoffs_row(k, s) for s in self.cases for k in self.cutoffs(s)
                                  if k.unit != 'activity'])
 
     def activity(self, scenario):
@@ -139,4 +139,12 @@ class ScenarioRunner(ComponentsMixin, LcaModelRunner):
         sc_apply = sc + tuple(self.common_scenarios)
         return frag_flow_lcia(self._traversals[scenario], lcia, scenario=sc_apply, **kwargs)
 
-
+    def set_descend(self, descend_spec=None, descend_all=None):
+        """
+        Descend can be specified by fragment using antelope_foreground.models.DescendSpec
+        :param descend_spec:
+        :param descend_all:
+        :return:
+        """
+        for q in self.quantities:
+            self.run_lcia(q, descend_spec=descend_spec, descend_all=descend_all)

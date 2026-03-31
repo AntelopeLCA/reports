@@ -67,7 +67,7 @@ class LcaModelRunner(object):
 
         :param agg_key: default is StageName
         """
-        self._scenarios = []  # sequential list of scenario names
+        self._cases = []  # sequential list of *case* names
 
         self._lcia_methods = []
         self._weightings = dict()
@@ -117,19 +117,23 @@ class LcaModelRunner(object):
         return scenario
 
     @property
-    def scenarios(self):
+    def cases(self):
         """
-        This returns keys for the 'scenarios' in the tool (first result index)
+        This returns keys for the 'cases' (combinations of scenario specs) in the tool (first result index)
         Must be implemented in a subclass
         :return:
         """
-        for k in self._scenarios:
+        for k in self._cases:
             yield k
 
-    def add_scenario(self, name):
-        if name in self._scenarios:
+    @property
+    def scenarios(self):
+        return self.cases
+
+    def add_case(self, name):
+        if name in self._cases:
             raise KeyError('Case already exists: %s' % name)
-        self._scenarios.append(name)
+        self._cases.append(name)
 
     @property
     def quantities(self):
@@ -202,7 +206,7 @@ class LcaModelRunner(object):
         ws = self._weightings[quantity]
         for q in ws.keys():
             self.run_lcia(q)
-        for scen in self.scenarios:
+        for scen in self.cases:
             self._run_case_weighting(scen, quantity)
 
     @property
@@ -225,12 +229,15 @@ class LcaModelRunner(object):
     def run_lcia(self, lcia, **kwargs):
         if lcia not in self._lcia_methods:
             self._lcia_methods.append(lcia)
-        for scen in self.scenarios:
+            if lcia.get('ShortName') is None:
+                lcia['ShortName'] = lcia['Name']
+            print('ShortName: %s' % lcia['ShortName'])
+        for scen in self.cases:
             self.run_lcia_case_method(scen, lcia, **kwargs)
         return self.lcia_results(lcia)
 
     def lcia_results(self, lcia):
-        return [self._results[scenario, lcia] for scenario in self.scenarios]
+        return [self._results[scenario, lcia] for scenario in self.cases]
 
     def _format(self, result):
         if self._fmt is None:
@@ -262,9 +269,9 @@ class LcaModelRunner(object):
     # tabular for all: accept *args as result items, go through them one by one
     def results_to_csv(self, filename, scenarios=None, style=None, aggregate=True, **kwargs):
         if scenarios is None:
-            scenarios = sorted(self.scenarios)
+            scenarios = sorted(self.cases)
         else:
-            known = list(self.scenarios)
+            known = list(self.cases)
             scenarios = list(filter(lambda x: x in known, scenarios))
 
         headings, agg = self._csv_formatter(style)
@@ -375,7 +382,7 @@ class LcaModelRunner(object):
 
     def scenario_summary_tbl(self, filename=None, column_order=None, norm=False, add_row_index=False):
         if column_order is None:
-            column_order = list(self.scenarios)
+            column_order = list(self.cases)
         dt = DataFrame(({k: self._format(self.result(k, lm).total()) for k in column_order}
                         for lm in self.quantities),
                        index=MultiIndex.from_tuples(self._qty_tuples))
@@ -437,12 +444,12 @@ class LcaModelRunner(object):
         if index is None:
             index = list(self.quantities)
         if summary:
-            return DataFrame(({case: self._results[case, q].total() for case in self.scenarios}
+            return DataFrame(({case: self._results[case, q].total() for case in self.cases}
                               for q in self.quantities),
                              index=index, **kwargs)
         else:
             return DataFrame(((q['ShortName'], q.unit, scenario, c.entity[0], c.entity[1], c.cumulative_result)
-                              for scenario in self.scenarios
+                              for scenario in self.cases
                               for q in self.quantities
                               for c in self.result(scenario, q).aggregate(key=self._agg).components()),
                              columns=('Quantity', 'Unit', 'Case', 'Stage', 'Alt', 'Result'))

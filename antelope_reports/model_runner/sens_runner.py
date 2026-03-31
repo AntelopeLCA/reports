@@ -56,12 +56,12 @@ class SensitivityRunner(ScenarioRunner):
 
     def add_hi_sense(self, param):
         self._sens_hi += self._scenario_tuple(param)
-        for case in self.scenarios:
+        for case in self.cases:
             self._traverse_hi(case)
 
     def add_lo_sense(self, param):
         self._sens_lo += self._scenario_tuple(param)
-        for case in self.scenarios:
+        for case in self.cases:
             self._traverse_lo(case)
 
     def _traverse_hi(self, case):

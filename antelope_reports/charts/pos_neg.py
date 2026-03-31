@@ -53,14 +53,14 @@ class _PosNegAxes(object):
 
         if autorange:
             a = AutoRange(self._span[1] - self._span[0])
-            self._ar_scale = a.scale
+            self.ar_scale = a.scale
             self._unit = a.adj_unit(qty.unit)
         else:
-            self._ar_scale = 1.0
+            self.ar_scale = 1.0
             self._unit = qty.unit
 
         ylim = [x, y + .065 * (y - x)]  # push out the top limit
-        self._ax.set_ylim([k * self._ar_scale for k in ylim])
+        self._ax.set_ylim([k * self.ar_scale for k in ylim])
 
 
     @property
@@ -69,13 +69,13 @@ class _PosNegAxes(object):
         Useful only for vertical bars.  We want to add 3pt, which is 1/18in.  span / size" = x / 1/18"
         :return:
         """
-        return (self._span[1] - self._span[0]) * self._ar_scale / (self._size * 18)
+        return (self._span[1] - self._span[0]) * self.ar_scale / (self._size * 18)
 
     def draw_pos_neg(self, x, pos, neg, num_format, pos_err=0.0):
 
-        pos *= self._ar_scale
-        pos_top = pos + pos_err * self._ar_scale
-        neg *= self._ar_scale
+        pos *= self.ar_scale
+        pos_top = pos + pos_err * self.ar_scale
+        neg *= self.ar_scale
 
         h = self._ax.bar(x, pos, align='center', width=0.85 * self._bw, color=self._color)
         if self._pos_handle is None:
@@ -106,10 +106,10 @@ class _PosNegAxes(object):
                           fontsize=self._fontsize)
 
     def draw_error_bars(self, x, pos, pos_err, neg, neg_err):
-        pos *= self._ar_scale
-        neg *= self._ar_scale
-        pe = (self._ar_scale * k for k in pos_err)
-        ne = (self._ar_scale * k for k in neg_err)
+        pos *= self.ar_scale
+        neg *= self.ar_scale
+        pe = (self.ar_scale * k for k in pos_err)
+        ne = (self.ar_scale * k for k in neg_err)
 
         xs = [x, x + self._bw]
         ys = [pos, pos + neg]
@@ -488,7 +488,7 @@ class PosNegCompareError(object):
         :param index:
         :return:
         """
-        scale = self._pna[index]._ar_scale
+        scale = self._pna[index].ar_scale
         if scale == 1:
             num_fmt = '%3.2g'
         else:

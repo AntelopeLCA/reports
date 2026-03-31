@@ -5,6 +5,8 @@ setup()
 """
 Version History
 
+0.2.4 - use 'cases' on model runner to distinguish from fragment 'scenarios'; fix a few charting bugs
+
 0.2.3 - correct 2 bugs in QuickAndEasy workflow: keep zero tap values, cast descend to bool in model maker
 
 0.2.2 - quick and easy add taps by recipe; node updater add targets w filter by spatial scope

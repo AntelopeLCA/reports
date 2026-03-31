@@ -8,7 +8,7 @@ We can imagine a number of different use cases:
 
 for now we will use subclassing
 """
-from antelope import enum, MultipleReferences, NoReference  # is this *always* an interactive tool?
+from antelope import e_, MultipleReferences, NoReference  # e_ = interactive list-select input
 from antelope_foreground.models import Anchor
 
 
@@ -45,7 +45,7 @@ class UpgradeManager(object):
         :param to_scenario: scenario name to use during observation. 'None' will not be accepted if scenario is also
         None-- specify 'default' if you want to overwrite the default scenario
         :param strategy:
-        :param autoskp: [False] If True, skip entries that have already been observed under to_scenario
+        :param autoskip: [False] If True, skip entries that have already been observed under to_scenario
         """
         self._fg = fg
         self._src = origin
@@ -161,7 +161,7 @@ class UpgradeManager(object):
 
     def candidates(self):
         if self._candidates:
-            enum(self._candidates)
+            e_(self._candidates)
 
     """
     different upgrade strategies
@@ -208,7 +208,7 @@ class UpgradeManager(object):
         """
         if strategy is None:
             strategy = self.strategy
-        self._candidates = enum(getattr(self, strategy)())
+        self._candidates = e_(getattr(self, strategy)())
 
     def attempt(self, x=None, strategy=None):
         if x:

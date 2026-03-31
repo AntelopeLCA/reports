@@ -2,7 +2,7 @@ from antelope_foreground.foreground_catalog import NoSuchForeground
 
 from antelope_core.contexts import NullContext
 from antelope import ConversionError, comp_dir
-from antelope import EntityNotFound, enum, MultipleReferences
+from antelope import EntityNotFound, e_, MultipleReferences  # e_ = interactive list-select input
 
 from .observations_from_spreadsheet import ObservationsFromSpreadsheet
 
@@ -115,7 +115,7 @@ class QuickAndEasy(object):
         elif len(hits) == 0:
             raise EntityNotFound
         else:
-            _ = enum(hits)
+            _ = e_(hits)
             if strict:
                 raise AmbiguousResult('Ambiguous termination: %d results found' % len(hits))
             print('Warning: Ambiguous termination: %d results found' % len(hits))

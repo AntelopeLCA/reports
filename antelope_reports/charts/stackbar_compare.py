@@ -17,8 +17,26 @@ from matplotlib import pyplot as plt
 from math import ceil
 
 
-def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, stage_colors=None, colormap='viridis',
+def make_stack_plot_from_df(df, cases=None, f_u='result', filename=None, _qs=None, stage_colors=None, colormap='viridis',
                             cmap_factor=1.0, wspace=0.3, nrows=1):
+    """
+    Supply a dataframe having the columns 'Quantity', 'Unit', 'Case', 'Stage', and 'Result'.  Generates a matplotlib
+    stacked bar plot where results are grouped by stage, stacked by case.
+
+    Optionally specify case names to be used for bar labels (defaults to dataframe case names)
+
+    :param df:
+    :param cases: list of bar labels (default: taken from dataframe)
+    :param f_u: functional unit (title) (default: 'result')
+    :param filename: [None] save image
+    :param _qs: optional list of quantity refs. 'ShortName' property and unit attribute are used in place of df content
+    :param stage_colors: optional mapping of stage name to color (cmap style)
+    :param colormap: NAME of colormap to be retrieved if stage_colors is not specified (default: 'viridis')
+    :param cmap_factor: allows the colormap to be 'stretched'. Colormap index is divided by this (default 1.0)
+    :param wspace: passed to plt.subplots_adjust()
+    :param nrows: number of rows to draw (i.e. if the number of cases is large) (default 1)
+    :return: plt.subplots figure
+    """
     # Pivot data to calculate stacked bar components
     # we want to preserve the order in the dataframe
     if _qs is None:
@@ -36,6 +54,9 @@ def make_stack_plot_from_df(df, cases, f_u='result', filename=None, _qs=None, st
     else:
         quantities = [q['ShortName'] for q in _qs]
         units = [q.unit for q in _qs]
+
+    if cases is None:
+        cases = list(df['Case'].unique())
 
     pivot_df = df.pivot_table(index=['Quantity', 'Case'], columns='Stage', values='Result', aggfunc='sum').fillna(
         0).reindex(

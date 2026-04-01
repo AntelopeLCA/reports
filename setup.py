@@ -5,6 +5,7 @@ setup()
 """
 Version History
 
+0.2.4.1 - e_ enumerator from antelope-interface
 0.2.4 - use 'cases' on model runner to distinguish from fragment 'scenarios'; fix a few charting bugs
 
 0.2.3 - correct 2 bugs in QuickAndEasy workflow: keep zero tap values, cast descend to bool in model maker

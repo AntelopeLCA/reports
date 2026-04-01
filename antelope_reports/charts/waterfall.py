@@ -32,7 +32,7 @@ from math import ceil
 
 # from math import floor
 
-from .base import save_plot, net_color
+from .base import save_plot, net_color, color_seed
 
 net_style = {
     'edgecolor': 'none'
@@ -54,13 +54,6 @@ def _fade_color(color):
     new_hue = (hsv[0] + 0.086) % 1
 
     return colorsys.hsv_to_rgb(new_hue, hsv[1]*0.65, hsv[2]*0.8)
-
-
-def random_color(seed, sat=0.65, val=0.95, offset=14669):
-
-    # hue = ((int('%.4s' % uuid, 16) + offset) % 65536) / 65536
-    hue = (hash((seed, offset)) % 65536)/65536
-    return colorsys.hsv_to_rgb(hue, sat, val)
 
 
 def grab_stages(*results, sort=None, count=None):
@@ -148,7 +141,7 @@ class WaterfallChart(object):
         if stage in self._color_dict:
             this_style = {'color': self._color_dict[stage]}
         else:
-            color = self._color or self._q.get('color') or random_color(self._q.uuid)
+            color = self._color or self._q.get('color') or color_seed.random_color(self._q.uuid)
             this_style = {'color': color}
         if stage in self._style_dict:
             this_style.update(self._style_dict[stage])

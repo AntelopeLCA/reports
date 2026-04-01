@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 from pandas import DataFrame, MultiIndex
 
 
-from .base import save_plot, net_color, standard_labels  # open_ylims,
-from .waterfall import random_color
+from .base import save_plot, net_color, standard_labels, color_seed  # open_ylims,
 from antelope_core.autorange import AutoRange
 
 
@@ -40,7 +39,7 @@ class _PosNegAxes(object):
             if qty.has_property('color'):
                 color = qty['color']
             else:
-                color = random_color(qty.uuid)
+                color = color_seed.random_color(qty.uuid)
 
         self._color = color
 

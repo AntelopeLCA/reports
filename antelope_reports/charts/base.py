@@ -3,6 +3,8 @@ import colorsys
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from textwrap import wrap
+from random import randint
+
 
 import os
 
@@ -49,6 +51,33 @@ def color_range(num, hue, sat=0.5):
 def hue_from_string(s, base=16):
     hue = int(s, base)
     return hue / (base**len(s))
+
+
+class ColorSeed:
+    """
+    a singleton to allow the user to change the random color seed for charting
+    from antelope_reports.charts.waterfall import color_seed
+    color_seed.roll()
+    """
+    def __init__(self):
+        self.seed = randint(0, 65535)
+
+    def roll(self):
+        """
+        to roll the dice
+        :return:
+        """
+        self.seed = randint(0, 65535)
+
+    def random_color(self, arg, sat=0.65, val=0.95, offset=None):
+        if offset is None:
+            offset = self.seed
+        # hue = ((int('%.4s' % uuid, 16) + offset) % 65536) / 65536
+        hue = (hash((arg, offset)) % 65536)/65536
+        return colorsys.hsv_to_rgb(hue, sat, val)
+
+
+color_seed = ColorSeed()
 
 
 def _label_bar(patch, value=None, label=None, valueformat='%4.3g', labelformat='%s'):

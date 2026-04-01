@@ -5,6 +5,7 @@ setup()
 """
 Version History
 
+0.2.4.2 - add color_seed singleton, default case names and documentation for stackbar plot
 0.2.4.1 - e_ enumerator from antelope-interface
 0.2.4 - use 'cases' on model runner to distinguish from fragment 'scenarios'; fix a few charting bugs
 

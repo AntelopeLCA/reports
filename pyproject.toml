@@ -30,5 +30,5 @@ dependencies = [
     "matplotlib",
     "pydot >= 2.0.0"
 ]
-version = "0.2.4.1"
+version = "0.2.4.2"
 urls = {Repository = "https://github.com/AntelopeLCA/reports"}
